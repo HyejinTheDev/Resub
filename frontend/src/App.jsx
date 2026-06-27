@@ -5,8 +5,13 @@ const API_BASE_URL = 'http://localhost:3051/api';
 
 // Available voices
 const VOICES = [
-  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (Nữ - Miền Nam)' },
-  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (Nam - Miền Nam)' }
+  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (Edge Nữ - Nam)' },
+  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (Edge Nam - Nam)' },
+  { id: 'fpt-banmai', name: 'Ban Mai (FPT Nữ - Bắc - Cần Key)' },
+  { id: 'fpt-leminh', name: 'Lê Minh (FPT Nam - Bắc - Cần Key)' },
+  { id: 'fpt-thuha', name: 'Thu Hà (FPT Nữ - Bắc - Cần Key)' },
+  { id: 'fpt-myan', name: 'Mỹ An (FPT Nữ - Nam - Cần Key)' },
+  { id: 'fpt-giahuy', name: 'Gia Huy (FPT Nam - Trung - Cần Key)' }
 ];
 
 const hexToRgba = (hex, opacity) => {
@@ -36,6 +41,7 @@ const TEXT_PRESETS = [
 
 export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [fptApiKey, setFptApiKey] = useState(() => localStorage.getItem('fpt_api_key') || '');
   const [activeTab, setActiveTab] = useState('url');
   const [videoUrlInput, setVideoUrlInput] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -370,7 +376,7 @@ export default function App() {
       heightPercentage: 15,
       blurRadius: 15,
       color: '#000000',
-      opacity: 0.45
+      opacity: 0.15
     };
     setBlurMasks(prev => [...prev, newBlur]);
     setActiveBlurIndex(blurMasks.length);
@@ -560,6 +566,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('gemini_api_key', geminiKey);
   }, [geminiKey]);
+
+  // Sync FPT key to localStorage
+  useEffect(() => {
+    localStorage.setItem('fpt_api_key', fptApiKey);
+  }, [fptApiKey]);
 
   // Sync HTML5 video volume with bgVolume state
   useEffect(() => {
@@ -838,7 +849,8 @@ export default function App() {
           subtitles,
           bgVolume,
           blurMasks,
-          subtitleStyle
+          subtitleStyle,
+          fptApiKey
         })
       });
 
@@ -873,7 +885,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: sub.text,
-          voice: sub.voice
+          voice: sub.voice,
+          fptApiKey
         })
       });
 
@@ -929,16 +942,29 @@ export default function App() {
           <span className="logo-text">RESUB</span>
           <span className="logo-badge">Auto Dubbing v1.0</span>
         </div>
-        <div className="api-key-container">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          <span className="key-label">Gemini Key:</span>
-          <input 
-            type="password" 
-            placeholder="Dán key vào đây..." 
-            className="key-input"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-          />
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div className="api-key-container">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span className="key-label">Gemini Key:</span>
+            <input 
+              type="password" 
+              placeholder="Dán key vào đây..." 
+              className="key-input"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+            />
+          </div>
+          <div className="api-key-container">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span className="key-label">FPT.AI Key:</span>
+            <input 
+              type="password" 
+              placeholder="Dán FPT key..." 
+              className="key-input"
+              value={fptApiKey}
+              onChange={(e) => setFptApiKey(e.target.value)}
+            />
+          </div>
         </div>
       </header>
 
@@ -1144,9 +1170,6 @@ export default function App() {
                         top: `${topVal}%`,
                         width: `${wVal}%`,
                         height: `${mask.heightPercentage}%`,
-                        backdropFilter: `blur(${mask.blurRadius}px) brightness(0.8)`,
-                        WebkitBackdropFilter: `blur(${mask.blurRadius}px) brightness(0.8)`,
-                        backgroundColor: hexToRgba(mask.color, mask.opacity),
                         pointerEvents: 'auto',
                         cursor: 'move',
                         position: 'absolute',
@@ -1155,6 +1178,20 @@ export default function App() {
                       }}
                       onMouseDown={(e) => handleMaskMouseDown(i, e)}
                     >
+                      {/* Feathered internal blur overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backdropFilter: `blur(${mask.blurRadius}px) brightness(1.0)`,
+                        WebkitBackdropFilter: `blur(${mask.blurRadius}px) brightness(1.0)`,
+                        backgroundColor: hexToRgba(mask.color, mask.opacity),
+                        maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+                        pointerEvents: 'none'
+                      }}></div>
                       {isSelected && (
                         <>
                           <div className="mask-select-border" style={{

@@ -202,7 +202,7 @@ app.post('/api/transcribe', async (req, res) => {
 
 // 4. Dub & Export (TTS + Burn-in subtitles)
 app.post('/api/dub', async (req, res) => {
-  const { videoPath, subtitles, voice, bgVolume, blurMask, blurMasks, subtitleStyle } = req.body;
+  const { videoPath, subtitles, voice, bgVolume, blurMask, blurMasks, subtitleStyle, fptApiKey } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
@@ -220,7 +220,8 @@ app.post('/api/dub', async (req, res) => {
       bgVolume: bgVolume !== undefined ? parseFloat(bgVolume) : 0.15,
       blurMask,
       blurMasks,
-      subtitleStyle
+      subtitleStyle,
+      fptApiKey
     });
 
     res.json({
@@ -237,7 +238,7 @@ app.post('/api/dub', async (req, res) => {
 
 // 5. TTS Preview
 app.post('/api/tts-preview', async (req, res) => {
-  const { text, voice } = req.body;
+  const { text, voice, fptApiKey } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
@@ -253,7 +254,7 @@ app.post('/api/tts-preview', async (req, res) => {
 
   try {
     const { generateTTS } = require('./services/dubbingEngine');
-    await generateTTS(text, voiceName, outputPath);
+    await generateTTS(text, voiceName, outputPath, fptApiKey);
 
     res.json({
       success: true,

@@ -2,7 +2,80 @@ const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const https = require('https');
 const { v4: uuidv4 } = require('uuid');
+
+function fetchUrl(url, method = 'GET', headers = {}, body = null) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: method,
+      headers: headers
+    };
+
+    const req = https.request(options, (res) => {
+      let data = [];
+      res.on('data', (chunk) => data.push(chunk));
+      res.on('end', () => {
+        const buffer = Buffer.concat(data);
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers,
+          body: buffer.toString('utf8'),
+          raw: buffer
+        });
+      });
+    });
+
+    req.on('error', (err) => reject(err));
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
+
+async function generateFptTTS(text, voice, apiKey, outputPath) {
+  const response = await fetchUrl('https://api.fpt.ai/hmi/tts/v5', 'POST', {
+    'api_key': apiKey,
+    'voice': voice.replace('fpt-', ''),
+    'speed': '0',
+    'format': 'mp3'
+  }, text);
+
+  if (response.statusCode !== 200) {
+    throw new Error(`FPT.AI TTS request failed: ${response.statusCode} - ${response.body}`);
+  }
+
+  const json = JSON.parse(response.body);
+  if (json.success !== "true" && json.success !== true) {
+    throw new Error(`FPT.AI error: ${json.message}`);
+  }
+
+  const audioUrl = json.message;
+  
+  let attempts = 0;
+  const maxAttempts = 15;
+  while (attempts < maxAttempts) {
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const checkRes = await fetchUrl(audioUrl, 'GET');
+      if (checkRes.statusCode === 200) {
+        if (!checkRes.body.startsWith('{')) {
+          fs.writeFileSync(outputPath, checkRes.raw);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn(`FPT.AI polling attempt ${attempts} failed:`, e.message);
+    }
+    attempts++;
+  }
+  throw new Error(`FPT.AI TTS generation timed out after 15 seconds.`);
+}
 
 // Paths to Python and FFmpeg
 const venvPath = path.join(__dirname, '..', '..', '..', 'oneclick-subtitles-generator', '.venv');
@@ -35,7 +108,15 @@ function getFfmpegCommand() {
 /**
  * Generate audio speech from text using Microsoft Edge TTS (via Python wrapper)
  */
-async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath) {
+async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, fptApiKey = '') {
+  if (voice.startsWith('fpt-')) {
+    if (!fptApiKey) {
+      throw new Error('FPT.AI API Key is required to use this voice. Please enter it in the top settings bar.');
+    }
+    await generateFptTTS(text, voice, fptApiKey, outputPath);
+    return outputPath;
+  }
+
   return new Promise((resolve, reject) => {
     const tempScript = path.join(os.tmpdir(), `edge_tts_${uuidv4()}.py`);
     const scriptContent = `
@@ -254,7 +335,8 @@ async function exportDubbedVideo({
   bgVolume = 0.15,
   blurMask,
   blurMasks,
-  subtitleStyle
+  subtitleStyle,
+  fptApiKey
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -278,7 +360,7 @@ async function exportDubbedVideo({
       const speedTtsPath = path.join(tempDir, `tts_${i}_speed.mp3`);
 
       // Generate base TTS
-      await generateTTS(sub.text, voice, rawTtsPath);
+      await generateTTS(sub.text, voice, rawTtsPath, fptApiKey);
       const ttsDuration = getAudioDuration(rawTtsPath);
 
       // Determine required speed-up
@@ -371,7 +453,9 @@ async function exportDubbedVideo({
       activeMasks.forEach(mask => {
         const start = parseTimeToMs(mask.startTime) / 1000;
         const end = parseTimeToMs(mask.endTime) / 1000;
+        const x = mask.xPercentage !== undefined ? mask.xPercentage : 50;
         const y = mask.yPercentage || 80;
+        const w = mask.widthPercentage !== undefined ? mask.widthPercentage : 80;
         const h = mask.heightPercentage || 15;
         const r = mask.blurRadius || 15;
         const hexColor = mask.color || '#000000';
@@ -380,10 +464,19 @@ async function exportDubbedVideo({
         
         const mainLabel = `main_${filterIndex}`;
         const cropLabel = `crop_${filterIndex}`;
-        const blurLabel = `blur_${filterIndex}`;
+        const toBlurLabel = `to_blur_${filterIndex}`;
+        const toMaskLabel = `to_mask_${filterIndex}`;
+        const blurredSrcLabel = `blurred_src_${filterIndex}`;
+        const alphaMaskLabel = `alpha_mask_${filterIndex}`;
+        const featheredLabel = `feathered_${filterIndex}`;
         const nextVLabel = `v_${filterIndex + 1}`;
         
-        filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];[${cropLabel}]crop=w=iw:h=ih*${h}/100:x=0:y=ih*${y}/100,boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${opacity}:t=fill[${blurLabel}];[${mainLabel}][${blurLabel}]overlay=x=0:y=ih*${y}/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
+        filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
+                       `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
+                       `[${toBlurLabel}]boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${opacity}:t=fill[${blurredSrcLabel}];` +
+                       `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.1:y=ih*0.1:w=iw*0.8:h=ih*0.8:color=white:t=fill,boxblur=luma_radius=${r}:luma_power=3[${alphaMaskLabel}];` +
+                       `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
+                       `[${mainLabel}][${featheredLabel}]overlay=x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         
         currentVInput = nextVLabel;
         filterIndex++;

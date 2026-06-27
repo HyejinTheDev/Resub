@@ -574,16 +574,9 @@ body {
 
 .video-blur-mask {
   position: absolute;
-  left: 0;
-  right: 0;
-  width: 100%;
   pointer-events: auto;
-  cursor: ns-resize;
-  background: rgba(0, 0, 0, 0.45);
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
-  z-index: 2;
-  border-top: 1px dashed rgba(255, 255, 255, 0.45);
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.45);
+  cursor: move;
+  z-index: 8;
 }
 
 .subtitle-overlay {
