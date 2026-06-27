@@ -80,6 +80,14 @@ function getFfmpegCommand() {
  */
 function extractAudio(videoPath, audioPath) {
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(videoPath)) {
+      return reject(new Error('Không tìm thấy tệp video được tải lên. Vui lòng thử lại.'));
+    }
+    const stats = fs.statSync(videoPath);
+    if (stats.size === 0) {
+      return reject(new Error('Tệp video tải lên bị trống (0 bytes). Vui lòng thử tải lại hoặc chọn tệp video khác.'));
+    }
+
     const ffmpeg = getFfmpegCommand();
     const args = [
       '-y',
@@ -95,8 +103,15 @@ function extractAudio(videoPath, audioPath) {
     let stderr = '';
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
     proc.on('close', (code) => {
-      if (code === 0) resolve(audioPath);
-      else reject(new Error(`FFmpeg audio extraction failed: ${stderr}`));
+      if (code === 0) {
+        resolve(audioPath);
+      } else {
+        if (stderr.includes('moov atom not found')) {
+          reject(new Error('Tệp video tải lên bị lỗi hoặc chưa hoàn thành (moov atom not found). Vui lòng tải lại tệp video hợp lệ.'));
+        } else {
+          reject(new Error(`Lỗi trích xuất âm thanh từ video: ${stderr.substring(0, 150)}...`));
+        }
+      }
     });
   });
 }
