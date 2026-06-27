@@ -41,7 +41,7 @@ const TEXT_PRESETS = [
 
 export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
-  const [fptApiKey, setFptApiKey] = useState(() => localStorage.getItem('fpt_api_key') || '');
+  const [fptApiKey, setFptApiKey] = useState(() => localStorage.getItem('fpt_api_key') || 'gpj9SyLQ2wJu9I3SDAkHSWes2tczoFpR');
   const [activeTab, setActiveTab] = useState('url');
   const [videoUrlInput, setVideoUrlInput] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
