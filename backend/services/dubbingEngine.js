@@ -368,7 +368,8 @@ async function exportDubbedVideo({
   blurMasks,
   subtitleStyle,
   fptApiKey,
-  cropStyle
+  cropStyle,
+  videoTransform
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -474,8 +475,20 @@ async function exportDubbedVideo({
     }
 
     // Process blur segments on original video size
+    const { zoom = 100, xOffset = 0, yOffset = 0, rotation = 0 } = videoTransform || {};
+    const hasTransform = zoom !== 100 || xOffset !== 0 || yOffset !== 0 || rotation !== 0;
+
     let currentVInput = '0:v';
     let filterIndex = 0;
+
+    if (hasTransform) {
+      const rotateLabel = `vrotated`;
+      filterGraph += `;[0:v]scale=w=iw*${zoom}/100:h=ih*${zoom}/100,rotate=angle=${rotation}*PI/180:fillcolor=black[${rotateLabel}];`;
+      filterGraph += `color=c=black:s=${originalDimensions.width}x${originalDimensions.height}[vbg];`;
+      filterGraph += `[vbg][${rotateLabel}]overlay=x=(W-w)/2+W*${xOffset}/100:y=(H-h)/2+H*${yOffset}/100[vtransformed]`;
+      
+      currentVInput = 'vtransformed';
+    }
     
     // Normalize masks list: if a single global mask is sent, convert to array format
     let activeMasks = [];
