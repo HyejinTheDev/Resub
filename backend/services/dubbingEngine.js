@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const https = require('https');
 const { v4: uuidv4 } = require('uuid');
+const { EdgeTTS } = require('node-edge-tts');
 
 function fetchUrl(url, method = 'GET', headers = {}, body = null) {
   return new Promise((resolve, reject) => {
@@ -148,99 +149,15 @@ async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, fptAp
     return outputPath;
   }
 
-  return new Promise((resolve, reject) => {
-    const tempScript = path.join(os.tmpdir(), `edge_tts_${uuidv4()}.py`);
-    const scriptContent = `
-import sys
-import json
-import asyncio
-import tempfile
-import os
-
-try:
-    if hasattr(sys.stdin, 'reconfigure'):
-        sys.stdin.reconfigure(encoding='utf-8')
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8')
-
-    import edge_tts
-
-    async def main():
-        data = json.loads(sys.stdin.read())
-        text = data["text"]
-        voice = data["voice"]
-        output_path = data["outputPath"]
-
-        # Create temporary text file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
-            temp_file.write(text)
-            temp_text_path = temp_file.name
-
-        try:
-            cmd = [
-                sys.executable, '-m', 'edge_tts',
-                '--voice', voice,
-                '--file', temp_text_path,
-                '--write-media', output_path
-            ]
-            import subprocess
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            print(json.dumps({'success': True}))
-        finally:
-            if os.path.exists(temp_text_path):
-                os.unlink(temp_text_path)
-
-    asyncio.run(main())
-except ImportError:
-    print(json.dumps({'success': False, 'error': 'edge-tts not installed in venv'}))
-    sys.exit(1)
-except Exception as e:
-    print(json.dumps({'success': False, 'error': str(e)}))
-    sys.exit(1)
-`;
-
-    fs.writeFileSync(tempScript, scriptContent, 'utf-8');
-
-    const pythonProcess = spawn(pythonExecutable, [tempScript], {
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let stdoutData = '';
-    let stderrData = '';
-
-    pythonProcess.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-
-    pythonProcess.stderr.on('data', (data) => {
-      stderrData += data.toString();
-    });
-
-    pythonProcess.on('close', (code) => {
-      // Clean up temp script
-      try {
-        if (fs.existsSync(tempScript)) fs.unlinkSync(tempScript);
-      } catch (e) {}
-
-      if (code !== 0) {
-        return reject(new Error(`Python process exited with code ${code}. Stderr: ${stderrData}. Stdout: ${stdoutData}`));
-      }
-
-      try {
-        const res = JSON.parse(stdoutData.trim());
-        if (res.success) {
-          resolve(outputPath);
-        } else {
-          reject(new Error(res.error || 'Failed to generate TTS'));
-        }
-      } catch (err) {
-        reject(new Error(`Failed to parse Python response: ${stdoutData}`));
-      }
-    });
-
-    pythonProcess.stdin.write(JSON.stringify({ text, voice, outputPath }));
-    pythonProcess.stdin.end();
+  const cleanVoice = voice.replace('edge-', '');
+  const tts = new EdgeTTS({
+    voice: cleanVoice,
+    lang: cleanVoice.substring(0, 5), // e.g. 'vi-VN'
+    outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
   });
+  
+  await tts.ttsPromise(text, outputPath);
+  return outputPath;
 }
 
 /**

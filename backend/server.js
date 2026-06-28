@@ -217,7 +217,7 @@ app.post('/api/transcribe', async (req, res) => {
 
 // 4. Dub & Export (TTS + Burn-in subtitles)
 app.post('/api/dub', async (req, res) => {
-  const { videoPath, subtitles, voice, bgVolume, blurMask, blurMasks, subtitleStyle, fptApiKey, cropStyle } = req.body;
+  const { videoPath, subtitles, voice, bgVolume, blurMask, blurMasks, subtitleStyle, fptApiKey, cropStyle, videoTransform } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
@@ -237,7 +237,8 @@ app.post('/api/dub', async (req, res) => {
       blurMasks,
       subtitleStyle,
       fptApiKey,
-      cropStyle
+      cropStyle,
+      videoTransform
     });
 
     res.json({
