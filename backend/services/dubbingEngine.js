@@ -105,6 +105,37 @@ function getFfmpegCommand() {
   return 'ffmpeg';
 }
 
+function getFfprobeCommand() {
+  const ffmpeg = getFfmpegCommand();
+  if (ffmpeg === 'ffmpeg') return 'ffprobe';
+  
+  const ffprobeWin = ffmpeg.replace('ffmpeg.exe', 'ffprobe.exe');
+  if (fs.existsSync(ffprobeWin)) return ffprobeWin;
+  
+  const ffprobeLinux = ffmpeg.replace('ffmpeg', 'ffprobe');
+  if (fs.existsSync(ffprobeLinux)) return ffprobeLinux;
+  
+  return 'ffprobe';
+}
+
+function getVideoDimensions(videoPath) {
+  try {
+    const ffprobe = getFfprobeCommand();
+    const cmd = `"${ffprobe}" -v error -select_streams v:0 -show_entries stream=width,height -of json "${videoPath}"`;
+    const output = execSync(cmd).toString();
+    const data = JSON.parse(output);
+    if (data.streams && data.streams[0]) {
+      return {
+        width: parseInt(data.streams[0].width) || 1280,
+        height: parseInt(data.streams[0].height) || 720
+      };
+    }
+  } catch (e) {
+    console.error('[getVideoDimensions] Error querying video resolution:', e.message);
+  }
+  return { width: 1280, height: 720 };
+}
+
 /**
  * Generate audio speech from text using Microsoft Edge TTS (via Python wrapper)
  */
@@ -336,7 +367,8 @@ async function exportDubbedVideo({
   blurMask,
   blurMasks,
   subtitleStyle,
-  fptApiKey
+  fptApiKey,
+  cropStyle
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -399,6 +431,18 @@ async function exportDubbedVideo({
     const srtPath = path.join(tempDir, 'subtitles.srt');
     generateSrtFile(subtitles, srtPath);
 
+    // Get original video dimensions to calculate accurate margins and crop sizes
+    const originalDimensions = getVideoDimensions(videoPath);
+    let targetWidth = originalDimensions.width;
+    let targetHeight = originalDimensions.height;
+
+    if (cropStyle && cropStyle.aspectRatio !== 'original') {
+      const wPercent = cropStyle.widthPercent !== undefined ? cropStyle.widthPercent : 100;
+      const hPercent = cropStyle.heightPercent !== undefined ? cropStyle.heightPercent : 100;
+      targetWidth = Math.round(originalDimensions.width * wPercent / 100);
+      targetHeight = Math.round(originalDimensions.height * hPercent / 100);
+    }
+
     // 4. Video filter graph for blur mask and subtitles
     let forceStyle = "FontName=Arial,Alignment=2";
     if (subtitleStyle) {
@@ -419,17 +463,17 @@ async function exportDubbedVideo({
       }
       
       const y = subtitleStyle.yPercent !== undefined ? subtitleStyle.yPercent : 85;
-      const marginV = Math.round((100 - y) / 100 * 720);
+      const marginV = Math.round((100 - y) / 100 * targetHeight);
       forceStyle += `,MarginV=${marginV}`;
 
       const wPercent = subtitleStyle.widthPercent !== undefined ? subtitleStyle.widthPercent : 80;
-      const marginH = Math.round(((100 - wPercent) / 2) / 100 * 1280);
+      const marginH = Math.round(((100 - wPercent) / 2) / 100 * targetWidth);
       forceStyle += `,MarginL=${marginH},MarginR=${marginH}`;
     } else {
       forceStyle += `,FontSize=30,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2`;
     }
 
-    // Process blur segments
+    // Process blur segments on original video size
     let currentVInput = '0:v';
     let filterIndex = 0;
     
@@ -481,10 +525,22 @@ async function exportDubbedVideo({
         currentVInput = nextVLabel;
         filterIndex++;
       });
-      filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
-    } else {
-      filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
     }
+
+    // Apply final crop if requested
+    if (cropStyle && cropStyle.aspectRatio !== 'original') {
+      const wPercent = cropStyle.widthPercent !== undefined ? cropStyle.widthPercent : 100;
+      const hPercent = cropStyle.heightPercent !== undefined ? cropStyle.heightPercent : 100;
+      const xVal = cropStyle.xPercent !== undefined ? cropStyle.xPercent : 50;
+      const yVal = cropStyle.yPercent !== undefined ? cropStyle.yPercent : 50;
+      
+      const cropLabel = `cropped_final`;
+      filterGraph += `;[${currentVInput}]crop=w=iw*${wPercent}/100:h=ih*${hPercent}/100:x=iw*(${xVal}-${wPercent}/2)/100:y=ih*(${yVal}-${hPercent}/2)/100[${cropLabel}]`;
+      currentVInput = cropLabel;
+    }
+
+    // Burn-in subtitles on the final cropped stream
+    filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
 
     // 5. Assemble final arguments
     ffmpegArgs.push(

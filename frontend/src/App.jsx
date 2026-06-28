@@ -43,6 +43,13 @@ export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [fptApiKey, setFptApiKey] = useState(() => localStorage.getItem('fpt_api_key') || 'gpj9SyLQ2wJu9I3SDAkHSWes2tczoFpR');
   const [activeTab, setActiveTab] = useState('url');
+  const [cropStyle, setCropStyle] = useState({
+    aspectRatio: 'original',
+    xPercent: 50,
+    yPercent: 50,
+    heightPercent: 100
+  });
+  const [videoDimensions, setVideoDimensions] = useState({ width: 1280, height: 720 });
   const [videoUrlInput, setVideoUrlInput] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   
@@ -559,6 +566,142 @@ export default function App() {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const isDraggingCropRef = useRef(false);
+  const isResizingCropRef = useRef(false);
+
+  const getCropDimensions = () => {
+    if (cropStyle.aspectRatio === 'original') {
+      return { w: 100, h: 100 };
+    }
+    const targetRatio = cropStyle.aspectRatio === '9:16' ? 9/16 :
+                        cropStyle.aspectRatio === '16:9' ? 16/9 : 1.0;
+    const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;
+    
+    let h = cropStyle.heightPercent;
+    let w = h * targetRatio / videoRatio;
+    
+    if (w > 100) {
+      const scale = 100 / w;
+      w = 100;
+      h = h * scale;
+    }
+    return { w: Math.round(w), h: Math.round(h) };
+  };
+
+  const handleCropMouseDown = (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    isDraggingCropRef.current = true;
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startXPercent = cropStyle.xPercent;
+    const startYPercent = cropStyle.yPercent;
+    
+    const videoContainerEl = videoRef.current ? videoRef.current.parentElement : null;
+    if (!videoContainerEl) return;
+    const rect = videoContainerEl.getBoundingClientRect();
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+    
+    const { w, h } = getCropDimensions();
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isDraggingCropRef.current) return;
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      
+      const deltaXPercent = (deltaX / containerWidth) * 100;
+      const deltaYPercent = (deltaY / containerHeight) * 100;
+      
+      const halfW = w / 2;
+      const halfH = h / 2;
+      
+      const newX = Math.max(halfW, Math.min(100 - halfW, startXPercent + deltaXPercent));
+      const newY = Math.max(halfH, Math.min(100 - halfH, startYPercent + deltaYPercent));
+      
+      setCropStyle(prev => ({
+        ...prev,
+        xPercent: Math.round(newX),
+        yPercent: Math.round(newY)
+      }));
+    };
+
+    const handleMouseUp = () => {
+      isDraggingCropRef.current = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleCropResizeMouseDown = (corner, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isResizingCropRef.current = true;
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startHeight = cropStyle.heightPercent;
+    
+    const videoContainerEl = videoRef.current ? videoRef.current.parentElement : null;
+    if (!videoContainerEl) return;
+    const rect = videoContainerEl.getBoundingClientRect();
+    const containerHeight = rect.height;
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isResizingCropRef.current) return;
+      const deltaY = moveEvent.clientY - startY;
+      
+      let changeY = (deltaY / containerHeight) * 100;
+      if (corner === 'tl' || corner === 'tr') {
+        changeY = -changeY;
+      }
+      
+      const newHeight = Math.max(20, Math.min(100, startHeight + changeY));
+      
+      setCropStyle(prev => {
+        const nextStyle = { ...prev, heightPercent: Math.round(newHeight) };
+        const targetRatio = prev.aspectRatio === '9:16' ? 9/16 :
+                            prev.aspectRatio === '16:9' ? 16/9 : 1.0;
+        const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;
+        
+        let tempH = newHeight;
+        let tempW = tempH * targetRatio / videoRatio;
+        if (tempW > 100) {
+          const scale = 100 / tempW;
+          tempW = 100;
+          tempH = tempH * scale;
+        }
+        
+        const halfW = tempW / 2;
+        const halfH = tempH / 2;
+        
+        const boundedX = Math.max(halfW, Math.min(100 - halfW, prev.xPercent));
+        const boundedY = Math.max(halfH, Math.min(100 - halfH, prev.yPercent));
+        
+        return {
+          ...nextStyle,
+          heightPercent: Math.round(tempH),
+          xPercent: Math.round(boundedX),
+          yPercent: Math.round(boundedY)
+        };
+      });
+    };
+
+    const handleMouseUp = () => {
+      isResizingCropRef.current = false;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
 
@@ -795,6 +938,10 @@ export default function App() {
   const handleLoadedMetadata = () => {
     if (!videoRef.current) return;
     setVideoDuration(videoRef.current.duration);
+    setVideoDimensions({
+      width: videoRef.current.videoWidth || 1280,
+      height: videoRef.current.videoHeight || 720
+    });
   };
 
   // Seek video to specific time
@@ -850,7 +997,14 @@ export default function App() {
           bgVolume,
           blurMasks,
           subtitleStyle,
-          fptApiKey
+          fptApiKey,
+          cropStyle: {
+            aspectRatio: cropStyle.aspectRatio,
+            xPercent: cropStyle.xPercent,
+            yPercent: cropStyle.yPercent,
+            widthPercent: getCropDimensions().w,
+            heightPercent: getCropDimensions().h
+          }
         })
       });
 
@@ -1140,7 +1294,7 @@ export default function App() {
 
             {/* Center Panel: Video Preview Player */}
             <section className="center-panel" style={{ width: `${100 - leftWidth - rightWidth}%` }}>
-              <div className="video-container">
+              <div className="video-container" style={{ aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` }}>
                 <video 
                   src={videoData.videoUrl}
                   ref={videoRef}
@@ -1149,6 +1303,97 @@ export default function App() {
                   onLoadedMetadata={handleLoadedMetadata}
                   onClick={togglePlay}
                 />
+                
+                {cropStyle.aspectRatio !== 'original' && (() => {
+                  const { w: cW, h: cH } = getCropDimensions();
+                  const cL = cropStyle.xPercent - cW / 2;
+                  const cT = cropStyle.yPercent - cH / 2;
+                  
+                  return (
+                    <div 
+                      className="crop-preview-box"
+                      style={{
+                        left: `${cL}%`,
+                        top: `${cT}%`,
+                        width: `${cW}%`,
+                        height: `${cH}%`,
+                        position: 'absolute',
+                        border: '2px dashed var(--accent)',
+                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
+                        cursor: 'move',
+                        zIndex: 10,
+                        boxSizing: 'border-box'
+                      }}
+                      onMouseDown={handleCropMouseDown}
+                    >
+                      {/* Bounding handles for corners */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        left: '-6px',
+                        width: '12px',
+                        height: '12px',
+                        borderLeft: '3px solid var(--accent)',
+                        borderTop: '3px solid var(--accent)',
+                        cursor: 'nwse-resize',
+                        zIndex: 11
+                      }} onMouseDown={(e) => handleCropResizeMouseDown('tl', e)} />
+                      
+                      <div style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        right: '-6px',
+                        width: '12px',
+                        height: '12px',
+                        borderRight: '3px solid var(--accent)',
+                        borderTop: '3px solid var(--accent)',
+                        cursor: 'nesw-resize',
+                        zIndex: 11
+                      }} onMouseDown={(e) => handleCropResizeMouseDown('tr', e)} />
+                      
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-6px',
+                        left: '-6px',
+                        width: '12px',
+                        height: '12px',
+                        borderLeft: '3px solid var(--accent)',
+                        borderBottom: '3px solid var(--accent)',
+                        cursor: 'nesw-resize',
+                        zIndex: 11
+                      }} onMouseDown={(e) => handleCropResizeMouseDown('bl', e)} />
+                      
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '-6px',
+                        right: '-6px',
+                        width: '12px',
+                        height: '12px',
+                        borderRight: '3px solid var(--accent)',
+                        borderBottom: '3px solid var(--accent)',
+                        cursor: 'nwse-resize',
+                        zIndex: 11
+                      }} onMouseDown={(e) => handleCropResizeMouseDown('br', e)} />
+                      
+                      {/* Aspect Ratio tag indicator */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '6px',
+                        left: '6px',
+                        background: 'rgba(0, 0, 0, 0.8)',
+                        color: '#fff',
+                        fontSize: '9px',
+                        padding: '2px 6px',
+                        borderRadius: '3px',
+                        fontWeight: 'bold',
+                        pointerEvents: 'none',
+                        letterSpacing: '0.5px'
+                      }}>
+                        CẮT: {cropStyle.aspectRatio}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {blurMasks.map((mask, i) => {
                   const start = parseTimeToSeconds(mask.startTime);
                   const end = parseTimeToSeconds(mask.endTime);
@@ -1917,6 +2162,144 @@ export default function App() {
                     
                     <div className="export-info-box">
                       Tiến hành tổng hợp thuyết minh tiếng Việt, điều chỉnh tốc độ khớp hình ảnh và chèn phụ đề.
+                    </div>
+
+                    <div style={{
+                      marginBottom: '20px',
+                      padding: '16px',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)'
+                    }}>
+                      <span className="control-label" style={{ display: 'block', marginBottom: '10px', fontSize: '13px', fontWeight: 600 }}>Tỷ lệ khung hình & Cắt video</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                        {[
+                          { id: 'original', name: 'Gốc' },
+                          { id: '9:16', name: '9:16' },
+                          { id: '16:9', name: '16:9' },
+                          { id: '1:1', name: '1:1' }
+                        ].map(ratio => (
+                          <button
+                            key={ratio.id}
+                            style={{
+                              padding: '8px 4px',
+                              background: cropStyle.aspectRatio === ratio.id ? 'var(--accent)' : 'rgba(255, 255, 255, 0.05)',
+                              color: cropStyle.aspectRatio === ratio.id ? '#000' : 'var(--text-color)',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: cropStyle.aspectRatio === ratio.id ? 'bold' : 'normal',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onClick={() => {
+                              const targetRatio = ratio.id === '9:16' ? 9/16 :
+                                                  ratio.id === '16:9' ? 16/9 : 1.0;
+                              const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;
+                              
+                              let h = 100;
+                              let w = h * targetRatio / videoRatio;
+                              if (w > 100) {
+                                const scale = 100 / w;
+                                w = 100;
+                                h = h * scale;
+                              }
+                              
+                              setCropStyle({
+                                aspectRatio: ratio.id,
+                                xPercent: 50,
+                                yPercent: 50,
+                                heightPercent: Math.round(h)
+                              });
+                            }}
+                          >
+                            {ratio.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {cropStyle.aspectRatio !== 'original' && (
+                        <div>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                            💡 Bạn có thể kéo trực tiếp khung cắt trên video để đổi vị trí, hoặc kéo 4 góc để co giãn!
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span>Chiều cao vùng cắt:</span>
+                              <span>{cropStyle.heightPercent}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="20"
+                              max="100"
+                              value={cropStyle.heightPercent}
+                              onChange={(e) => {
+                                const newH = parseInt(e.target.value);
+                                setCropStyle(prev => {
+                                  const targetRatio = prev.aspectRatio === '9:16' ? 9/16 :
+                                                      prev.aspectRatio === '16:9' ? 16/9 : 1.0;
+                                  const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;
+                                  
+                                  let tempH = newH;
+                                  let tempW = tempH * targetRatio / videoRatio;
+                                  if (tempW > 100) {
+                                    const scale = 100 / tempW;
+                                    tempW = 100;
+                                    tempH = tempH * scale;
+                                  }
+                                  
+                                  const halfW = tempW / 2;
+                                  const halfH = tempH / 2;
+                                  
+                                  const boundedX = Math.max(halfW, Math.min(100 - halfW, prev.xPercent));
+                                  const boundedY = Math.max(halfH, Math.min(100 - halfH, prev.yPercent));
+                                  
+                                  return {
+                                    ...prev,
+                                    heightPercent: Math.round(tempH),
+                                    xPercent: Math.round(boundedX),
+                                    yPercent: Math.round(boundedY)
+                                  };
+                                });
+                              }}
+                              className="volume-range-slider"
+                            />
+                            <button
+                              style={{
+                                padding: '6px 10px',
+                                background: 'transparent',
+                                border: '1px dashed var(--border-color)',
+                                borderRadius: '4px',
+                                color: 'var(--text-muted)',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                marginTop: '4px'
+                              }}
+                              onClick={() => {
+                                const targetRatio = cropStyle.aspectRatio === '9:16' ? 9/16 :
+                                                    cropStyle.aspectRatio === '16:9' ? 16/9 : 1.0;
+                                const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;
+                                
+                                let h = 100;
+                                let w = h * targetRatio / videoRatio;
+                                if (w > 100) {
+                                  const scale = 100 / w;
+                                  w = 100;
+                                  h = h * scale;
+                                }
+                                setCropStyle(prev => ({
+                                  ...prev,
+                                  xPercent: 50,
+                                  yPercent: 50,
+                                  heightPercent: Math.round(h)
+                                }));
+                              }}
+                            >
+                              Đặt lại vị trí trung tâm
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {!exportedVideoUrl ? (
