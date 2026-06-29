@@ -255,12 +255,14 @@ app.post('/api/dub', async (req, res) => {
 
 // 5. TTS Preview
 app.post('/api/tts-preview', async (req, res) => {
-  const { text, voice, fptApiKey } = req.body;
+  const { text, voice, fptApiKey, capcutCookie } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
 
   const voiceName = voice || 'vi-VN-HoaiMyNeural';
+  console.log(`[api/tts-preview] Request: text="${text}", voice="${voiceName}", cookieLength=${capcutCookie ? capcutCookie.length : 0}`);
+  
   const tempTtsDir = path.join(DOWNLOADS_DIR, 'temp_tts');
   if (!fs.existsSync(tempTtsDir)) {
     fs.mkdirSync(tempTtsDir, { recursive: true });
@@ -271,7 +273,7 @@ app.post('/api/tts-preview', async (req, res) => {
 
   try {
     const { generateTTS } = require('./services/dubbingEngine');
-    await generateTTS(text, voiceName, outputPath, fptApiKey);
+    await generateTTS(text, voiceName, outputPath, fptApiKey, capcutCookie);
 
     res.json({
       success: true,

@@ -11,7 +11,21 @@ const VOICES = [
   { id: 'fpt-leminh', name: 'Lê Minh (FPT Nam - Bắc - Cần Key)' },
   { id: 'fpt-thuha', name: 'Thu Hà (FPT Nữ - Bắc - Cần Key)' },
   { id: 'fpt-myan', name: 'Mỹ An (FPT Nữ - Nam - Cần Key)' },
-  { id: 'fpt-giahuy', name: 'Gia Huy (FPT Nam - Trung - Cần Key)' }
+  { id: 'fpt-giahuy', name: 'Gia Huy (FPT Nam - Trung - Cần Key)' },
+  { id: 'capcut-cogaihoatngon', name: 'Cô Gái Hoạt Ngôn (CapCut - Cần Cookie)' },
+  { id: 'capcut-nhongotngao', name: 'Nhỏ Ngọt Ngào (CapCut - Cần Cookie)' },
+  { id: 'capcut-nuphothong', name: 'Nữ Phổ Thông (CapCut - Cần Cookie)' },
+  { id: 'capcut-giongbe', name: 'Giọng Bé (CapCut - Cần Cookie)' },
+  { id: 'capcut-banmai', name: 'Ban Mai (CapCut - Cần Cookie)' },
+  { id: 'capcut-review1', name: 'Review Phim new (CapCut - Cần Cookie)' },
+  { id: 'capcut-review2', name: 'Review Phim 2 (CapCut - Cần Cookie)' },
+  { id: 'capcut-review3', name: 'Review Phim 3 (CapCut - Cần Cookie)' },
+  { id: 'capcut-review4', name: 'Review Phim 4 (CapCut - Cần Cookie)' },
+  { id: 'capcut-sunnyidol', name: 'Sunny Idol (CapCut - Cần Cookie)' },
+  { id: 'capcut-bantin1', name: 'Bản Tin 1 (CapCut - Cần Cookie)' },
+  { id: 'capcut-bantinnu', name: 'Bản Tin nữ (CapCut - Cần Cookie)' },
+  { id: 'capcut-vietmeo', name: 'Việt Méo (CapCut - Cần Cookie)' },
+  { id: 'capcut-kennydaide', name: 'Kenny Đại Đế (CapCut - Cần Cookie)' }
 ];
 
 const hexToRgba = (hex, opacity) => {
@@ -42,6 +56,7 @@ const TEXT_PRESETS = [
 export default function App() {
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [fptApiKey, setFptApiKey] = useState(() => localStorage.getItem('fpt_api_key') || 'gpj9SyLQ2wJu9I3SDAkHSWes2tczoFpR');
+  const [capcutCookie, setCapcutCookie] = useState(() => localStorage.getItem('capcut_cookie') || '');
   const [activeTab, setActiveTab] = useState('url');
   const [cropStyle, setCropStyle] = useState({
     aspectRatio: 'original',
@@ -1004,6 +1019,7 @@ export default function App() {
           blurMasks,
           subtitleStyle,
           fptApiKey,
+          capcutCookie,
           cropStyle: {
             aspectRatio: cropStyle.aspectRatio,
             xPercent: cropStyle.xPercent,
@@ -1047,7 +1063,8 @@ export default function App() {
         body: JSON.stringify({
           text: sub.text,
           voice: sub.voice,
-          fptApiKey
+          fptApiKey,
+          capcutCookie
         })
       });
 
@@ -1124,6 +1141,20 @@ export default function App() {
               className="key-input"
               value={fptApiKey}
               onChange={(e) => setFptApiKey(e.target.value)}
+            />
+          </div>
+          <div className="api-key-container">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            <span className="key-label">CapCut Cookie:</span>
+            <input 
+              type="password" 
+              placeholder="Dán Cookie CapCut..." 
+              className="key-input"
+              value={capcutCookie}
+              onChange={(e) => {
+                setCapcutCookie(e.target.value);
+                localStorage.setItem('capcut_cookie', e.target.value);
+              }}
             />
           </div>
         </div>

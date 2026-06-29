@@ -137,15 +137,154 @@ function getVideoDimensions(videoPath) {
   return { width: 1280, height: 720 };
 }
 
+const CAPCUT_VOICES = {
+  'capcut-nhongotngao': { speaker: 'BV421_vivn_streaming', item_id: '7252594014782755330' },
+  'capcut-nuphothong': { speaker: 'vi_female_huong', item_id: '7264854897953083905' },
+  'capcut-giongbe': { speaker: 'BV074_streaming_dsp', item_id: '7550087831092251920' },
+  'capcut-cogaihoatngon': { speaker: 'BV074_streaming', item_id: '7102355709945188865' },
+  'capcut-vietmeo': { speaker: 'BV075_streaming_vibrato_dsp', item_id: '7569450639810465040' },
+  'capcut-mai': { speaker: 'BV562_streaming', item_id: '7483736254694035984' },
+  'capcut-banmai': { speaker: 'multi_female_yangguangnv_uranus_bigtts', item_id: '7637456432522218773' },
+  'capcut-review1': { speaker: 'multi_female_richgirl_uranus_bigtts', item_id: '7637460351541447956' },
+  'capcut-bantin1': { speaker: 'multi_female_quanweinv_uranus_bigtts', item_id: '7637458743197732117' },
+  'capcut-review4': { speaker: 'multi_female_stokie_uranus_bigtts', item_id: '7637456729696996628' },
+  'capcut-review3': { speaker: 'multi_female_daqi_uranus_bigtts', item_id: '7637451983389019409' },
+  'capcut-review2': { speaker: 'multi_female_xyf04auto_uranus_bigtts', item_id: '7637458743197732117' },
+  'capcut-bantinnu': { speaker: 'multi_female_sisi_uranus_bigtts', item_id: '7637455857285860629' },
+  'capcut-sunnyidol': { speaker: 'multi_female_kiwi_uranus_bigtts', item_id: '7637457995882089749' },
+  'capcut-kennydaide': { speaker: 'BV075_streaming_demon_dsp', item_id: '7569442422665661712' }
+};
+
+const crypto = require('crypto');
+
+async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
+  if (!capcutCookie) {
+    throw new Error('Bạn cần nhập Cookie CapCut ở thanh menu trên cùng để sử dụng giọng nói này.');
+  }
+
+  // Sanitize and format cookie string if it's pasted in a multiline / key-value format
+  let sanitizedCookie = capcutCookie.trim();
+  if (sanitizedCookie.includes('\n') || sanitizedCookie.includes('\r')) {
+    const lines = sanitizedCookie.split(/[\r\n]+/);
+    const parsedPairs = [];
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+      
+      // Handle "Key: Value" or "Key=Value" format
+      let separatorIndex = line.indexOf(':');
+      if (separatorIndex === -1) {
+        separatorIndex = line.indexOf('=');
+      }
+      if (separatorIndex !== -1) {
+        const key = line.substring(0, separatorIndex).trim();
+        const val = line.substring(separatorIndex + 1).trim();
+        if (key && val) {
+          if (key.toLowerCase() === 'cookie') {
+            parsedPairs.push(val);
+          } else {
+            parsedPairs.push(`${key}=${val}`);
+          }
+        }
+      } else {
+        parsedPairs.push(line);
+      }
+    }
+    sanitizedCookie = parsedPairs.join('; ');
+  }
+
+  const voiceConfig = CAPCUT_VOICES[voiceKey];
+  if (!voiceConfig) {
+    throw new Error(`Unsupported CapCut voice key: ${voiceKey}`);
+  }
+
+  const body = {
+    texts: [text],
+    tts_conf: {
+      speaker: voiceConfig.speaker,
+      rate: 1,
+      volume: 100,
+      name: voiceKey,
+      platform: "sami",
+      effect_id: voiceConfig.item_id,
+      resource_id: voiceConfig.item_id,
+      is_clone: false
+    },
+    need_url: true
+  };
+
+  const payloadText = JSON.stringify(body);
+  const payloadBuffer = Buffer.from(payloadText, 'utf8');
+
+  const deviceTime = Math.floor(Date.now() / 1000);
+  const pathPart = 'latform';
+  const pf = '7';
+  const appvr = '8.4.0';
+  const tdid = '';
+
+  // Generate MD5 signature
+  const signStr = `9e2c|${pathPart}|${pf}|${appvr}|${deviceTime}|${tdid}|11ac`;
+  const sign = crypto.createHash('md5').update(signStr).digest('hex');
+
+  const headers = {
+    'Cookie': sanitizedCookie,
+    'Content-Type': 'application/json',
+    'Content-Length': payloadBuffer.length,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Origin': 'https://www.capcut.com',
+    'Referer': 'https://www.capcut.com/',
+    'did': '7655937363961415189',
+    'sign-ver': '1',
+    'sign': sign,
+    'pf': pf,
+    'store-country-code': 'vn',
+    'store-country-code-src': 'uid',
+    'appvr': appvr,
+    'appid': '348188',
+    'device-time': String(deviceTime)
+  };
+
+  const response = await fetchUrl('https://edit-api-sg.capcut.com/storyboard/v1/tts/multi_platform', 'POST', headers, payloadBuffer);
+
+  if (response.statusCode !== 200) {
+    throw new Error(`CapCut TTS Request failed: ${response.statusCode} - ${response.body}`);
+  }
+
+  const json = JSON.parse(response.body);
+  if (json.ret !== '0' && json.ret !== 0) {
+    throw new Error(`CapCut TTS API error: ${json.errmsg || 'Unknown error'}`);
+  }
+
+  if (!json.data || !json.data.tts_materials || !json.data.tts_materials[0]) {
+    throw new Error('CapCut TTS API did not return any audio materials');
+  }
+
+  const audioUrl = json.data.tts_materials[0].meta_data.url;
+  
+  // Download the generated mp3 file
+  const downloadRes = await fetchUrl(audioUrl, 'GET');
+  if (downloadRes.statusCode !== 200) {
+    throw new Error(`Failed to download audio from CapCut: Status ${downloadRes.statusCode}`);
+  }
+
+  fs.writeFileSync(outputPath, downloadRes.raw);
+  return outputPath;
+}
+
 /**
- * Generate audio speech from text using Microsoft Edge TTS (via Python wrapper)
+ * Generate audio speech from text using Microsoft Edge TTS, FPT.AI, or CapCut TTS
  */
-async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, fptApiKey = '') {
+async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, fptApiKey = '', capcutCookie = '') {
   if (voice.startsWith('fpt-')) {
     if (!fptApiKey) {
       throw new Error('FPT.AI API Key is required to use this voice. Please enter it in the top settings bar.');
     }
     await generateFptTTS(text, voice, fptApiKey, outputPath);
+    return outputPath;
+  }
+
+  if (voice.startsWith('capcut-')) {
+    await generateCapCutTTS(text, voice, outputPath, capcutCookie);
     return outputPath;
   }
 
@@ -286,7 +425,8 @@ async function exportDubbedVideo({
   subtitleStyle,
   fptApiKey,
   cropStyle,
-  videoTransform
+  videoTransform,
+  capcutCookie
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -310,7 +450,7 @@ async function exportDubbedVideo({
       const speedTtsPath = path.join(tempDir, `tts_${i}_speed.mp3`);
 
       // Generate base TTS
-      await generateTTS(sub.text, voice, rawTtsPath, fptApiKey);
+      await generateTTS(sub.text, sub.voice || voice, rawTtsPath, fptApiKey, capcutCookie);
       const ttsDuration = getAudioDuration(rawTtsPath);
 
       // Determine required speed-up
