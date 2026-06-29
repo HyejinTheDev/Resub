@@ -132,6 +132,8 @@ Your response MUST be a JSON array only. Follow this exact JSON structure:
 ]
 
 IMPORTANT RULES:
+- CRITICAL: Split subtitle segments into short, readable phrases. Each segment's Vietnamese translation ("text") MUST be at most 8-10 words (or under 3 seconds in duration) so that it fits cleanly on a single line.
+- If a speaker says a long sentence, you MUST split it into multiple consecutive smaller segments with precise start and end times matching the word timings.
 - Translate idioms and cultural references into natural Vietnamese phrasing.
 - Return ONLY the raw JSON array. DO NOT wrap it in markdown code blocks like \`\`\`json. DO NOT add any explanations or notes.`;
 
