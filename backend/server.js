@@ -42,6 +42,17 @@ app.use('/downloads', express.static(DOWNLOADS_DIR));
 // Register API Router
 app.use('/api', apiRouter);
 
+// Serve React frontend static files in production
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/downloads')) {
+      res.sendFile(path.join(frontendDistPath, 'index.html'));
+    }
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Resub backend running at http://localhost:${PORT}`);
 });
