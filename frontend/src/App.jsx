@@ -487,33 +487,6 @@ export default function App() {
                   Nếu để trống, hệ thống sẽ tự động dùng và xoay vòng các API Key trong bể chứa trung tâm.
                 </small>
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
-                  🍪 CapCut Web Cookie
-                </label>
-                <textarea 
-                  placeholder="Nhập Cookie từ trang web CapCut..." 
-                  value={capcutCookie}
-                  onChange={(e) => setCapcutCookie(e.target.value)}
-                  rows={4}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: 'var(--bg-tertiary, #0d0d14)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '12px',
-                    outline: 'none',
-                    fontFamily: 'monospace',
-                    resize: 'vertical',
-                    boxSizing: 'border-box'
-                  }}
-                />
-                <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                  Dùng để kích hoạt giọng đọc lồng tiếng của CapCut. Để trống nếu muốn dùng giọng lồng tiếng mặc định.
-                </small>
               </div>
             </div>
 

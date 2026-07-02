@@ -239,7 +239,9 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
  */
 async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcutCookie = '') {
   if (voice.startsWith('capcut-')) {
-    await generateCapCutTTS(text, voice, outputPath, capcutCookie);
+    // Use env var as fallback if no cookie provided from frontend
+    const cookie = capcutCookie || process.env.CAPCUT_COOKIE || '';
+    await generateCapCutTTS(text, voice, outputPath, cookie);
     return outputPath;
   }
 
