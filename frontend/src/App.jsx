@@ -487,7 +487,6 @@ export default function App() {
                   Nếu để trống, hệ thống sẽ tự động dùng và xoay vòng các API Key trong bể chứa trung tâm.
                 </small>
               </div>
-              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
