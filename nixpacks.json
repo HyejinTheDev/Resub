@@ -1,0 +1,8 @@
+{
+  "providers": ["node"],
+  "phases": {
+    "setup": {
+      "aptPkgs": ["ffmpeg"]
+    }
+  }
+}
