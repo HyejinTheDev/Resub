@@ -5,6 +5,10 @@ const multer = require('multer');
 const { spawn, execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
+const { OAuth2Client } = require('google-auth-library');
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '874744439002-c4q4lhmlhndu81c3c97u4k4l2v4rbl7k.apps.googleusercontent.com';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
 const { downloadVideo } = require('../services/downloader');
 const { uploadFileToGemini, waitForFileProcessing, deleteGeminiFile, transcribeAndTranslate } = require('../services/geminiService');
 const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
@@ -17,6 +21,169 @@ const VIDEOS_DIR = path.join(DOWNLOADS_DIR, 'videos');
 const AUDIOS_DIR = path.join(DOWNLOADS_DIR, 'audios');
 const EXPORTS_DIR = path.join(DOWNLOADS_DIR, 'exports');
 const TEMP_TTS_DIR = path.join(DOWNLOADS_DIR, 'temp_tts');
+const USERS_FILE = path.join(DOWNLOADS_DIR, 'users.json');
+
+// Helper to read users
+function readUsers() {
+  if (!fs.existsSync(USERS_FILE)) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify([]));
+  }
+  try {
+    return JSON.parse(fs.readFileSync(USERS_FILE));
+  } catch (e) {
+    return [];
+  }
+}
+
+// Helper to write users
+function writeUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// Auth endpoints
+router.post('/auth/register', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  const users = readUsers();
+  const exists = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  if (exists) {
+    return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại!' });
+  }
+
+  const newUser = {
+    id: uuidv4(),
+    username,
+    password, // Store simply for local project use
+    createdAt: new Date().toISOString()
+  };
+
+  users.push(newUser);
+  writeUsers(users);
+
+  res.json({
+    success: true,
+    user: { id: newUser.id, username: newUser.username }
+  });
+});
+
+router.post('/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  const users = readUsers();
+  const user = users.find(
+    u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+  );
+
+  if (!user) {
+    return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
+  }
+
+  res.json({
+    success: true,
+    user: { id: user.id, username: user.username }
+  });
+});
+
+// Google Auth configuration endpoint
+router.get('/auth/google-config', (req, res) => {
+  res.json({ clientId: GOOGLE_CLIENT_ID });
+});
+
+// Google Auth verification & login/register endpoint
+router.post('/auth/google', async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    return res.status(400).json({ error: 'ID Token (credential) is required' });
+  }
+
+  try {
+    // Verify token with Google API
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(400).json({ error: 'Invalid token payload' });
+    }
+
+    const { email, name, picture } = payload;
+    if (!email) {
+      return res.status(400).json({ error: 'Email not provided by Google' });
+    }
+
+    // Map email username (e.g. name@gmail.com -> name)
+    const username = email.split('@')[0];
+
+    const users = readUsers();
+    let user = users.find(u => u.email === email || u.username.toLowerCase() === username.toLowerCase());
+
+    if (!user) {
+      // Auto-register new Google user
+      user = {
+        id: uuidv4(),
+        username,
+        email,
+        avatar: picture,
+        password: uuidv4(), // Random password
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      writeUsers(users);
+      console.log(`[Google Auth] Auto-registered new user: ${username} (${email})`);
+    } else {
+      // Update avatar if changed
+      if (picture && user.avatar !== picture) {
+        user.avatar = picture;
+        writeUsers(users);
+      }
+      console.log(`[Google Auth] Logged in existing user: ${user.username} (${email})`);
+    }
+
+    res.json({
+      success: true,
+      user: { id: user.id, username: user.username, email: user.email, avatar: user.avatar }
+    });
+  } catch (error) {
+    console.error('[Google Auth Error]:', error.message);
+    res.status(400).json({ error: `Xác thực Google thất bại: ${error.message}` });
+  }
+});
+
+
+// KeyManager Server Integration Configuration
+const KEY_MANAGER_URL = process.env.KEY_MANAGER_URL || 'http://localhost:3060';
+const KEY_MANAGER_TOKEN = process.env.KEY_MANAGER_TOKEN || 'resub_secret_key_rotation_token_123';
+
+async function fetchKeyFromManager() {
+  const response = await fetch(`${KEY_MANAGER_URL}/api/get-key`, {
+    headers: { 'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` }
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unknown KeyManager error' }));
+    throw new Error(err.error || 'Failed to fetch API key from KeyManager');
+  }
+  const data = await response.json();
+  return data.apiKey;
+}
+
+async function reportBadKeyToManager(key, type) {
+  await fetch(`${KEY_MANAGER_URL}/api/report-bad-key`, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` 
+    },
+    body: JSON.stringify({ key, type })
+  }).catch(err => console.error('[api/reportBadKey] Failed:', err.message));
+}
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
@@ -130,8 +297,17 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   const videoId = path.basename(req.file.filename, path.extname(req.file.filename));
   const videoPath = req.file.path;
   const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
+  const ffprobe = getFfprobeCommand();
 
   try {
+    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
+
+    if (duration > 600) {
+      fs.unlinkSync(videoPath);
+      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
+    }
+
     await extractAudio(videoPath, audioPath);
 
     const PORT = process.env.PORT || 3051;
@@ -152,70 +328,114 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 // Initialize progress tracking map
 global.transcribeProgress = global.transcribeProgress || {};
 
-// 3. Transcribe & Translate (Async Background Task)
+// 3. Transcribe & Translate (Async Background Task with Rotation & Failover)
 router.post('/transcribe', async (req, res) => {
   const { audioPath, geminiKey, taskId } = req.body;
-  if (!audioPath || !geminiKey || !taskId) {
-    return res.status(400).json({ error: 'audioPath, geminiKey, and taskId are required' });
+  if (!audioPath || !taskId) {
+    return res.status(400).json({ error: 'audioPath and taskId are required' });
   }
 
   if (!fs.existsSync(audioPath)) {
     return res.status(404).json({ error: `Audio file not found at path: ${audioPath}` });
   }
 
-  console.log(`[api/transcribe] Starting background transcription task: ${taskId} for ${audioPath}`);
+  const useSystemPool = !geminiKey;
+  console.log(`[api/transcribe] Starting background transcription task: ${taskId} for ${audioPath} (useSystemPool: ${useSystemPool})`);
   
   // Initialize progress
   global.transcribeProgress[taskId] = { 
     status: 'uploading', 
-    percent: 15, 
-    message: 'Gửi âm thanh lên máy chủ Google AI...' 
+    percent: 5, 
+    message: 'Khởi tạo tác vụ nhận dạng & dịch thuật...' 
   };
 
   // Start background process
   (async () => {
-    try {
-      // Step 1: Upload to Gemini Files API
-      const fileInfo = await uploadFileToGemini(audioPath, 'audio/mp3', geminiKey);
-      console.log(`[api/transcribe] Uploaded to Google: ${fileInfo.name}`);
+    let currentKey = geminiKey;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      // Update progress
-      global.transcribeProgress[taskId] = { 
-        status: 'processing', 
-        percent: 45, 
-        message: 'Google AI đang phân tích tệp âm thanh...' 
-      };
+    while (attempts < maxAttempts) {
+      if (useSystemPool) {
+        try {
+          global.transcribeProgress[taskId] = { 
+            status: 'uploading', 
+            percent: 10, 
+            message: 'Đang mượn API Key từ KeyManager...' 
+          };
+          currentKey = await fetchKeyFromManager();
+        } catch (keyErr) {
+          console.error('[api/transcribe] Failed to fetch key from KeyManager:', keyErr.message);
+          global.transcribeProgress[taskId] = { 
+            status: 'error', 
+            percent: 100, 
+            error: `Bể chứa Key báo lỗi: ${keyErr.message}` 
+          };
+          return;
+        }
+      }
 
-      // Step 2: Wait for file processing
-      await waitForFileProcessing(fileInfo.name, geminiKey);
+      try {
+        // Step 1: Upload to Gemini Files API
+        global.transcribeProgress[taskId] = { 
+          status: 'uploading', 
+          percent: 20, 
+          message: 'Gửi âm thanh lên máy chủ Google AI...' 
+        };
+        const fileInfo = await uploadFileToGemini(audioPath, 'audio/mp3', currentKey);
+        console.log(`[api/transcribe] Uploaded to Google: ${fileInfo.name}`);
 
-      // Update progress
-      global.transcribeProgress[taskId] = { 
-        status: 'transcribing', 
-        percent: 75, 
-        message: 'Gemini AI đang nhận dạng tiếng Trung & biên dịch phụ đề...' 
-      };
+        // Step 2: Wait for file processing
+        global.transcribeProgress[taskId] = { 
+          status: 'processing', 
+          percent: 50, 
+          message: 'Google AI đang phân tích tệp âm thanh...' 
+        };
+        await waitForFileProcessing(fileInfo.name, currentKey);
 
-      // Step 3: Call model
-      const subtitles = await transcribeAndTranslate(fileInfo.uri, geminiKey);
-      console.log(`[api/transcribe] Task ${taskId} successfully generated ${subtitles.length} segments`);
+        // Step 3: Call model
+        global.transcribeProgress[taskId] = { 
+          status: 'transcribing', 
+          percent: 80, 
+          message: 'Gemini AI đang nhận dạng tiếng Trung & biên dịch phụ đề...' 
+        };
+        const subtitles = await transcribeAndTranslate(fileInfo.uri, currentKey);
+        console.log(`[api/transcribe] Task ${taskId} successfully generated ${subtitles.length} segments`);
 
-      // Clean up remote file
-      deleteGeminiFile(fileInfo.name, geminiKey).catch(() => {});
+        // Clean up remote file
+        deleteGeminiFile(fileInfo.name, currentKey).catch(() => {});
 
-      // Final progress update
-      global.transcribeProgress[taskId] = { 
-        status: 'done', 
-        percent: 100, 
-        subtitles 
-      };
-    } catch (error) {
-      console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
-      global.transcribeProgress[taskId] = { 
-        status: 'error', 
-        percent: 100, 
-        error: error.message 
-      };
+        // Final progress update
+        global.transcribeProgress[taskId] = { 
+          status: 'done', 
+          percent: 100, 
+          subtitles 
+        };
+        return; // Success, exit loop
+      } catch (error) {
+        console.error(`[api/transcribe] Attempt ${attempts + 1} failed:`, error.message);
+        
+        if (useSystemPool) {
+          // Identify key hỏng / key rate limit
+          const isInvalid = error.message.includes('403') || error.message.includes('API key not valid');
+          console.warn(`[api/transcribe] Reporting bad key: ${currentKey.substring(0, 8)}... (isInvalid: ${isInvalid})`);
+          await reportBadKeyToManager(currentKey, isInvalid ? 'invalid' : 'rate');
+          
+          attempts++;
+          if (attempts < maxAttempts) {
+            console.log(`[api/transcribe] Retrying transcription attempt ${attempts + 1}/${maxAttempts}...`);
+            continue;
+          }
+        }
+        
+        // Final failure if no retries left or not using pool
+        global.transcribeProgress[taskId] = { 
+          status: 'error', 
+          percent: 100, 
+          error: error.message 
+        };
+        return;
+      }
     }
   })();
 
@@ -253,6 +473,14 @@ router.post('/dub', async (req, res) => {
   console.log(`[api/dub] Starting dubbing export for ${videoPath}...`);
 
   try {
+    const ffprobe = getFfprobeCommand();
+    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
+
+    if (duration > 600) {
+      return res.status(400).json({ error: 'Video xuất quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
+    }
+
     await exportDubbedVideo({
       videoPath,
       subtitles,
@@ -334,6 +562,11 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
     // 1. Get original video duration using ffprobe
     const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const originalDuration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
+
+    if (originalDuration > 600) {
+      fs.unlinkSync(videoPath);
+      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
+    }
 
     // 2. Perform splitting
     const outputPattern = path.join(splitDirPath, `part_%03d${videoExt}`);
@@ -424,3 +657,4 @@ router.post('/load-split-segment', async (req, res) => {
 });
 
 module.exports = router;
+

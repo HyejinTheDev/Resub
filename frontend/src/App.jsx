@@ -11,9 +11,12 @@ import PreviewPlayer from './features/preview-player/PreviewPlayer';
 import InspectorPanel from './features/inspector/InspectorPanel';
 import TimelineWorkspace from './features/timeline/TimelineWorkspace';
 
+import { useAuthStore } from './store/useAuthStore';
+import AuthScreen from './features/auth/AuthScreen';
 import './App.css';
 
 export default function App() {
+  const { currentUser, logout } = useAuthStore();
 
   const {
     videoData,
@@ -58,6 +61,10 @@ export default function App() {
     capcutCookie,
     setCapcutCookie
   } = useSettingsStore();
+
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
 
   // Auto-save project progress whenever relevant editor state changes
   useEffect(() => {
@@ -237,6 +244,8 @@ export default function App() {
     setActiveSubtitleIndex(index);
   }, [currentTime, subtitles]);
 
+
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -267,30 +276,80 @@ export default function App() {
           <span className="logo-text">RESUB</span>
           <span className="logo-badge">Auto Dubbing v1.0</span>
         </div>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div className="api-key-container">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            <span className="key-label">Gemini Key:</span>
-            <input 
-              type="password" 
-              placeholder="Dán key vào đây..." 
-              className="key-input"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-            />
-          </div>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          {currentUser && currentUser.username === 'admin' && (
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="action-btn"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-color)',
+                fontSize: '12px',
+                fontWeight: 600,
+                gap: '6px',
+                transition: 'background 0.2s'
+              }}
+              title="Cấu hình hệ thống"
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+            >
+              ⚙️ Cấu hình
+            </button>
+          )}
 
-          <div className="api-key-container">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{color: 'var(--accent)'}}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-            <span className="key-label">CapCut Cookie:</span>
-            <input 
-              type="password" 
-              placeholder="Dán Cookie CapCut..." 
-              className="key-input"
-              value={capcutCookie}
-              onChange={(e) => setCapcutCookie(e.target.value)}
-            />
-          </div>
+          {currentUser && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Tài khoản:</span>
+                <strong style={{ color: 'var(--accent)' }}>{currentUser.username}</strong>
+              </div>
+              <button
+                onClick={logout}
+                className="action-btn"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Đăng xuất
+              </button>
+            </div>
+          )}
+
+          {!currentUser && (
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="action-btn"
+              style={{
+                background: 'var(--accent, #10b981)',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 14px',
+                cursor: 'pointer',
+                color: '#000',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            >
+              🔑 Đăng nhập
+            </button>
+          )}
         </div>
       </header>
 
@@ -363,6 +422,142 @@ export default function App() {
             <TimelineWorkspace videoRef={videoRef} />
           </div>
         </main>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary, #171923)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '24px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--accent, #10b981)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚙️ Cấu hình hệ thống
+              </h3>
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', outline: 'none' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
+                  🔑 Gemini API Key (Cá nhân)
+                </label>
+                <input 
+                  type="password" 
+                  placeholder="Dán Gemini API Key của bạn (Để trống nếu muốn dùng bể chứa của hệ thống)..." 
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: 'var(--bg-tertiary, #0d0d14)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  Nếu để trống, hệ thống sẽ tự động dùng và xoay vòng các API Key trong bể chứa trung tâm.
+                </small>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
+                  🍪 CapCut Web Cookie
+                </label>
+                <textarea 
+                  placeholder="Nhập Cookie từ trang web CapCut..." 
+                  value={capcutCookie}
+                  onChange={(e) => setCapcutCookie(e.target.value)}
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: 'var(--bg-tertiary, #0d0d14)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    outline: 'none',
+                    fontFamily: 'monospace',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  Dùng để kích hoạt giọng đọc lồng tiếng của CapCut. Để trống nếu muốn dùng giọng lồng tiếng mặc định.
+                </small>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="action-btn"
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  background: 'var(--accent, #10b981)',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                Lưu cấu hình
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal Overlay */}
+      {showAuthModal && !currentUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ position: 'relative' }}>
+            <AuthScreen onClose={() => setShowAuthModal(false)} />
+          </div>
+        </div>
       )}
 
       {/* Toast Notification */}

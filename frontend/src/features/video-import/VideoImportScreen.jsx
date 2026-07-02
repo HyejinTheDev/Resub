@@ -55,11 +55,32 @@ export default function VideoImportScreen() {
     });
   };
 
+  const validateVideoDuration = (file, onSuccess) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      const duration = video.duration;
+      if (duration > 600) {
+        showToast('Video quá dài! Thời lượng tối đa cho phép tải lên là 10 phút (600 giây).');
+      } else {
+        onSuccess();
+      }
+    };
+    video.onerror = () => {
+      onSuccess();
+    };
+    video.src = URL.createObjectURL(file);
+  };
+
   const handleSplitFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setSplitFile(file);
-      setSplitSegments([]);
+      validateVideoDuration(file, () => {
+        setSplitFile(file);
+        setSplitSegments([]);
+      });
+      e.target.value = null;
     }
   };
 
@@ -151,39 +172,43 @@ export default function VideoImportScreen() {
     const file = e.target.files[0];
     if (!file) return;
     
-    setIsProcessing(true);
-    setUploadProgress(0);
-    setStatusMessage('Đang tải video lên: 0%');
-    setVideoData(null);
-    setSubtitles([]);
+    validateVideoDuration(file, async () => {
+      setIsProcessing(true);
+      setUploadProgress(0);
+      setStatusMessage('Đang tải video lên: 0%');
+      setVideoData(null);
+      setSubtitles([]);
 
-    const formData = new FormData();
-    formData.append('video', file);
+      const formData = new FormData();
+      formData.append('video', file);
 
-    try {
-      const data = await uploadWithProgress(`${API_BASE_URL}/upload`, formData, (percent) => {
-        setUploadProgress(percent);
-        if (percent < 100) {
-          setStatusMessage(`Đang tải video lên: ${percent}%`);
-        } else {
-          setStatusMessage('Tải video hoàn tất! Đang trích xuất nhạc nền...');
+      try {
+        const data = await uploadWithProgress(`${API_BASE_URL}/upload`, formData, (percent) => {
+          setUploadProgress(percent);
+          if (percent < 100) {
+            setStatusMessage(`Đang tải video lên: ${percent}%`);
+          } else {
+            setStatusMessage('Tải video hoàn tất! Đang trích xuất nhạc nền...');
+          }
+        });
+
+        setUploadProgress(0);
+        const subs = await handleTranscribe(data.audioPath);
+        
+        if (subs) {
+          setSubtitles(subs);
+          setVideoData(data);
+          showToast(`Hoàn tất! Đã tạo ${subs.length} phân đoạn thuyết minh.`);
         }
-      });
-
-      setUploadProgress(0);
-      const subs = await handleTranscribe(data.audioPath);
-      
-      if (subs) {
-        setSubtitles(subs);
-        setVideoData(data);
-        showToast(`Hoàn tất! Đã tạo ${subs.length} phân đoạn thuyết minh.`);
+      } catch (error) {
+        showToast(`Lỗi: ${error.message}`);
+      } finally {
+        setIsProcessing(false);
+        setUploadProgress(0);
       }
-    } catch (error) {
-      showToast(`Lỗi: ${error.message}`);
-    } finally {
-      setIsProcessing(false);
-      setUploadProgress(0);
-    }
+    });
+
+    e.target.value = null;
   };
 
   const handleLoadSegmentAsProject = async (filePath) => {

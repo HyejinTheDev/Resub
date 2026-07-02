@@ -1,20 +1,12 @@
 export const VOICES = [
-  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (Edge Nữ - Nam)' },
-  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (Edge Nam - Nam)' },
-  { id: 'capcut-cogaihoatngon', name: 'Cô Gái Hoạt Ngôn (CapCut - Cần Cookie)' },
-  { id: 'capcut-nhongotngao', name: 'Nhỏ Ngọt Ngào (CapCut - Cần Cookie)' },
-  { id: 'capcut-nuphothong', name: 'Nữ Phổ Thông (CapCut - Cần Cookie)' },
-  { id: 'capcut-giongbe', name: 'Giọng Bé (CapCut - Cần Cookie)' },
-  { id: 'capcut-banmai', name: 'Ban Mai (CapCut - Cần Cookie)' },
-  { id: 'capcut-review1', name: 'Review Phim new (CapCut - Cần Cookie)' },
-  { id: 'capcut-review2', name: 'Review Phim 2 (CapCut - Cần Cookie)' },
-  { id: 'capcut-review3', name: 'Review Phim 3 (CapCut - Cần Cookie)' },
-  { id: 'capcut-review4', name: 'Review Phim 4 (CapCut - Cần Cookie)' },
-  { id: 'capcut-sunnyidol', name: 'Sunny Idol (CapCut - Cần Cookie)' },
-  { id: 'capcut-bantin1', name: 'Bản Tin 1 (CapCut - Cần Cookie)' },
-  { id: 'capcut-bantinnu', name: 'Bản Tin nữ (CapCut - Cần Cookie)' },
-  { id: 'capcut-vietmeo', name: 'Việt Méo (CapCut - Cần Cookie)' },
-  { id: 'capcut-kennydaide', name: 'Kenny Đại Đế (CapCut - Cần Cookie)' }
+  { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My' },
+  { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh' },
+  { id: 'capcut-cogaihoatngon', name: 'Cô Gái Hoạt Ngôn' },
+  { id: 'capcut-nhongotngao', name: 'Nhỏ Ngọt Ngào' },
+  { id: 'capcut-nuphothong', name: 'Nữ Phổ Thông' },
+  { id: 'capcut-giongbe', name: 'Giọng Bé' },
+  { id: 'capcut-vietmeo', name: 'Việt Méo' },
+  { id: 'capcut-kennydaide', name: 'Kenny Đại Đế' }
 ];
 
 export const PRESET_COLORS = [
