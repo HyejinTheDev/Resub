@@ -273,12 +273,11 @@ router.post('/download', async (req, res) => {
     const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
     await extractAudio(videoPath, audioPath);
 
-    const PORT = process.env.PORT || 3051;
     res.json({
       success: true,
       videoId,
-      videoUrl: `http://localhost:${PORT}/downloads/videos/${videoId}.mp4`,
-      audioUrl: `http://localhost:${PORT}/downloads/audios/${videoId}.mp3`,
+      videoUrl: `/downloads/videos/${videoId}.mp4`,
+      audioUrl: `/downloads/audios/${videoId}.mp3`,
       videoPath,
       audioPath
     });
@@ -310,12 +309,11 @@ router.post('/upload', upload.single('video'), async (req, res) => {
 
     await extractAudio(videoPath, audioPath);
 
-    const PORT = process.env.PORT || 3051;
     res.json({
       success: true,
       videoId,
-      videoUrl: `http://localhost:${PORT}/downloads/videos/${videoId}.mp4`,
-      audioUrl: `http://localhost:${PORT}/downloads/audios/${videoId}.mp3`,
+      videoUrl: `/downloads/videos/${videoId}.mp4`,
+      audioUrl: `/downloads/audios/${videoId}.mp3`,
       videoPath,
       audioPath
     });
@@ -498,11 +496,10 @@ router.post('/dub', async (req, res) => {
       exportQuality
     });
 
-    const PORT = process.env.PORT || 3051;
     res.json({
       success: true,
       exportId,
-      videoUrl: `http://localhost:${PORT}/downloads/exports/${exportId}.mp4`,
+      videoUrl: `/downloads/exports/${exportId}.mp4`,
       outputPath
     });
   } catch (error) {
@@ -527,10 +524,9 @@ router.post('/tts-preview', async (req, res) => {
   try {
     await generateTTS(text, voiceName, outputPath, capcutCookie);
 
-    const PORT = process.env.PORT || 3051;
     res.json({
       success: true,
-      audioUrl: `http://localhost:${PORT}/downloads/temp_tts/${filename}`
+      audioUrl: `/downloads/temp_tts/${filename}`
     });
   } catch (error) {
     console.error('[api/tts-preview] Error:', error.message);
@@ -591,7 +587,7 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
       const segDurationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
       const duration = parseFloat(cpExecSync(segDurationCmd).toString().trim()) || 0;
 
-      const fileUrl = `http://localhost:${PORT}/downloads/exports/${splitDirName}/${file}`;
+      const fileUrl = `/downloads/exports/${splitDirName}/${file}`;
       
       segments.push({
         index,
@@ -641,12 +637,11 @@ router.post('/load-split-segment', async (req, res) => {
   try {
     await extractAudio(targetVideoPath, audioPath);
 
-    const PORT = process.env.PORT || 3051;
     res.json({
       success: true,
       videoId,
-      videoUrl: `http://localhost:${PORT}/downloads/videos/${videoId}${videoExt}`,
-      audioUrl: `http://localhost:${PORT}/downloads/audios/${videoId}.mp3`,
+      videoUrl: `/downloads/videos/${videoId}${videoExt}`,
+      audioUrl: `/downloads/audios/${videoId}.mp3`,
       videoPath: targetVideoPath,
       audioPath
     });
