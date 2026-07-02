@@ -114,12 +114,6 @@ export default function VideoImportScreen() {
 
   const handleTranscribe = (audioPath) => {
     return new Promise((resolve, reject) => {
-      if (!geminiKey) {
-        showToast('Vui lòng nhập Gemini API Key để dịch thuật phụ đề!');
-        resolve(null);
-        return;
-      }
-
       const taskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       setStatusMessage('Đang khởi tạo dịch thuật phụ đề...');
       setUploadProgress(5);
@@ -375,17 +369,9 @@ export default function VideoImportScreen() {
                 style={{display: 'none'}} 
                 accept="video/*"
                 onChange={handleFileUpload}
-                disabled={!geminiKey}
               />
             </label>
           </div>
-
-          {!geminiKey && (
-            <p style={{color: '#f87171', fontSize: '13px', marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              Vui lòng nhập Gemini Key ở góc trên bên phải trước khi tải video.
-            </p>
-          )}
         </div>
 
       </div>
