@@ -2,17 +2,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #0a0b0e;
-  --bg-secondary: #13151a;
-  --bg-tertiary: #1b1e25;
+  --bg-primary: #090a0f; /* Deep dark for video preview canvas & timeline tracks */
+  --bg-secondary: #171921; /* Dark slate for left subtitle cards & right inspector panel */
+  --bg-tertiary: #202330; /* Lighter slate for panel headers, tabs, and input containers */
   --accent: #22c55e; /* Emerald / Neon Green like CapCut active */
   --accent-glow: rgba(34, 197, 94, 0.25);
   --text-main: #f3f4f6;
   --text-muted: #9ca3af;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --glass-bg: rgba(19, 21, 26, 0.7);
-  --glass-blur: blur(12px);
-  --track-bg: #16181f;
+  --border-color: #2b2e3c; /* Crisp solid border divider */
+  --glass-bg: rgba(23, 25, 33, 0.85);
+  --glass-blur: blur(16px);
+  --track-bg: #111218; /* Dark track background */
   --wave-color: rgba(34, 197, 94, 0.4);
 }
 
@@ -886,7 +886,7 @@ body {
 
 /* Splitter Resizer Styles */
 .resizer-col {
-  width: 4px;
+  width: 6px;
   background: var(--border-color);
   cursor: col-resize;
   transition: background 0.2s;
@@ -900,7 +900,7 @@ body {
 }
 
 .resizer-row {
-  height: 4px;
+  height: 6px;
   background: var(--border-color);
   cursor: row-resize;
   transition: background 0.2s;

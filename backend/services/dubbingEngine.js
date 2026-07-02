@@ -39,44 +39,7 @@ function fetchUrl(url, method = 'GET', headers = {}, body = null) {
   });
 }
 
-async function generateFptTTS(text, voice, apiKey, outputPath) {
-  const response = await fetchUrl('https://api.fpt.ai/hmi/tts/v5', 'POST', {
-    'api_key': apiKey,
-    'voice': voice.replace('fpt-', ''),
-    'speed': '0',
-    'format': 'mp3'
-  }, text);
 
-  if (response.statusCode !== 200) {
-    throw new Error(`FPT.AI TTS request failed: ${response.statusCode} - ${response.body}`);
-  }
-
-  const json = JSON.parse(response.body);
-  if (json.success !== "true" && json.success !== true) {
-    throw new Error(`FPT.AI error: ${json.message}`);
-  }
-
-  const audioUrl = json.message;
-  
-  let attempts = 0;
-  const maxAttempts = 15;
-  while (attempts < maxAttempts) {
-    await new Promise(r => setTimeout(r, 1000));
-    try {
-      const checkRes = await fetchUrl(audioUrl, 'GET');
-      if (checkRes.statusCode === 200) {
-        if (!checkRes.body.startsWith('{')) {
-          fs.writeFileSync(outputPath, checkRes.raw);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn(`FPT.AI polling attempt ${attempts} failed:`, e.message);
-    }
-    attempts++;
-  }
-  throw new Error(`FPT.AI TTS generation timed out after 15 seconds.`);
-}
 
 // Paths to Python and FFmpeg
 const venvPath = path.join(__dirname, '..', '..', '..', 'oneclick-subtitles-generator', '.venv');
@@ -274,15 +237,7 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
 /**
  * Generate audio speech from text using Microsoft Edge TTS, FPT.AI, or CapCut TTS
  */
-async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, fptApiKey = '', capcutCookie = '') {
-  if (voice.startsWith('fpt-')) {
-    if (!fptApiKey) {
-      throw new Error('FPT.AI API Key is required to use this voice. Please enter it in the top settings bar.');
-    }
-    await generateFptTTS(text, voice, fptApiKey, outputPath);
-    return outputPath;
-  }
-
+async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcutCookie = '') {
   if (voice.startsWith('capcut-')) {
     await generateCapCutTTS(text, voice, outputPath, capcutCookie);
     return outputPath;
@@ -420,13 +375,15 @@ async function exportDubbedVideo({
   voice = 'vi-VN-HoaiMyNeural',
   outputPath,
   bgVolume = 0.15,
+  ttsVolume = 1.0,
   blurMask,
   blurMasks,
   subtitleStyle,
-  fptApiKey,
   cropStyle,
   videoTransform,
-  capcutCookie
+  capcutCookie,
+  exportResolution = 'original',
+  exportQuality = 'medium'
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -450,7 +407,7 @@ async function exportDubbedVideo({
       const speedTtsPath = path.join(tempDir, `tts_${i}_speed.mp3`);
 
       // Generate base TTS
-      await generateTTS(sub.text, sub.voice || voice, rawTtsPath, fptApiKey, capcutCookie);
+      await generateTTS(sub.text, sub.voice || voice, rawTtsPath, capcutCookie);
       const ttsDuration = getAudioDuration(rawTtsPath);
 
       // Determine required speed-up
@@ -474,11 +431,11 @@ async function exportDubbedVideo({
     // Scale original audio volume to bgVolume
     filterGraph += `[0:a]volume=${bgVolume}[bg];`;
 
-    // Delay each TTS track
+    // Delay and scale volume of each TTS track
     ttsFiles.forEach((file, index) => {
       // index + 1 matches the input index in ffmpeg
       const inputIndex = index + 1;
-      filterGraph += `[${inputIndex}:a]adelay=${file.startMs}|${file.startMs}[tts_${index}];`;
+      filterGraph += `[${inputIndex}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[tts_${index}];`;
       filterInputs.push(`[tts_${index}]`);
     });
 
@@ -499,6 +456,21 @@ async function exportDubbedVideo({
       const hPercent = cropStyle.heightPercent !== undefined ? cropStyle.heightPercent : 100;
       targetWidth = Math.round(originalDimensions.width * wPercent / 100);
       targetHeight = Math.round(originalDimensions.height * hPercent / 100);
+    }
+
+    // Adjust target dimensions if exportResolution is specified
+    if (exportResolution && exportResolution !== 'original') {
+      const heightMap = {
+        '1080p': 1080,
+        '720p': 720,
+        '480p': 480
+      };
+      const targetH = heightMap[exportResolution];
+      if (targetH) {
+        const ratio = targetWidth / targetHeight;
+        targetHeight = targetH;
+        targetWidth = Math.round(targetH * ratio);
+      }
     }
 
     // 4. Video filter graph for blur mask and subtitles
@@ -609,15 +581,39 @@ async function exportDubbedVideo({
       currentVInput = cropLabel;
     }
 
+    // Apply final scale if requested
+    if (exportResolution && exportResolution !== 'original') {
+      const heightMap = {
+        '1080p': 1080,
+        '720p': 720,
+        '480p': 480
+      };
+      const targetH = heightMap[exportResolution];
+      if (targetH) {
+        const scaleLabel = `scaled_final`;
+        filterGraph += `;[${currentVInput}]scale=-2:${targetH}[${scaleLabel}]`;
+        currentVInput = scaleLabel;
+      }
+    }
+
     // Burn-in subtitles on the final cropped stream
     filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
 
     // 5. Assemble final arguments
+    const qualityCrfMap = {
+      'high': '18',
+      'medium': '23',
+      'low': '28'
+    };
+    const crfValue = qualityCrfMap[exportQuality] || '23';
+
     ffmpegArgs.push(
       '-filter_complex', filterGraph,
       '-map', '[vout]',
       '-map', '[aout]',
       '-c:v', 'libx264',
+      '-crf', crfValue,
+      '-preset', 'veryfast',
       '-c:a', 'aac',
       '-shortest',
       outputPath
@@ -651,5 +647,7 @@ module.exports = {
   generateTTS,
   adjustAudioSpeed,
   exportDubbedVideo,
-  parseTimeToMs
+  parseTimeToMs,
+  getFfmpegCommand,
+  getFfprobeCommand
 };

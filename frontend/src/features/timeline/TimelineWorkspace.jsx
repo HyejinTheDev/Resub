@@ -13,14 +13,17 @@ export default function TimelineWorkspace({ videoRef }) {
     setBlurMasks,
     activeBlurIndex,
     setActiveBlurIndex,
-    setInspectorTab
+    setInspectorTab,
+    saveHistory
   } = useProjectStore();
 
   const {
     currentTime,
     setCurrentTime,
     videoDuration,
-    isPlaying
+    isPlaying,
+    pixelsPerSecond,
+    setPixelsPerSecond
   } = usePlaybackStore();
 
   const timelineRef = useRef(null);
@@ -29,11 +32,30 @@ export default function TimelineWorkspace({ videoRef }) {
   // Auto-scroll timeline to keep playhead centered during playback
   useEffect(() => {
     if (timelineRef.current && isPlaying) {
-      const pixelsPerSecond = 50;
       const scrollPos = currentTime * pixelsPerSecond - timelineRef.current.clientWidth / 2;
       timelineRef.current.scrollLeft = Math.max(0, scrollPos);
     }
-  }, [currentTime, isPlaying]);
+  }, [currentTime, isPlaying, pixelsPerSecond]);
+
+  // Alt + Mouse Wheel Zoom Listener
+  useEffect(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+
+    const handleWheelEvent = (e) => {
+      if (e.altKey) {
+        e.preventDefault();
+        const zoomDelta = e.deltaY < 0 ? 5 : -5;
+        const newZoom = Math.min(Math.max(pixelsPerSecond + zoomDelta, 20), 150);
+        setPixelsPerSecond(newZoom);
+      }
+    };
+
+    el.addEventListener('wheel', handleWheelEvent, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheelEvent);
+    };
+  }, [pixelsPerSecond, setPixelsPerSecond]);
 
   const handleTimelineMouseDown = (e) => {
     if (e.button !== 0) return;
@@ -60,7 +82,6 @@ export default function TimelineWorkspace({ videoRef }) {
       if (!tracksEl) return;
       const rect = tracksEl.getBoundingClientRect();
       const clickX = clientX - rect.left;
-      const pixelsPerSecond = 50;
       const targetTime = Math.max(0, Math.min(clickX / pixelsPerSecond, videoDuration || 0));
       
       if (videoRef.current) {
@@ -94,6 +115,9 @@ export default function TimelineWorkspace({ videoRef }) {
     e.stopPropagation();
     e.preventDefault();
     
+    // Save history snapshot before resize action starts
+    saveHistory();
+    
     const startX = e.clientX;
     const sub = subtitles[index];
     const originalStart = parseTimeToSeconds(sub.startTime);
@@ -101,7 +125,7 @@ export default function TimelineWorkspace({ videoRef }) {
     
     const handleMouseMove = (moveEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const deltaSeconds = deltaX / 50; // 50px = 1 second
+      const deltaSeconds = deltaX / pixelsPerSecond;
       
       if (edge === 'left') {
         const newStart = Math.max(0, Math.min(originalEnd - 0.1, originalStart + deltaSeconds));
@@ -129,6 +153,9 @@ export default function TimelineWorkspace({ videoRef }) {
     e.stopPropagation();
     e.preventDefault();
     
+    // Save history snapshot before resize action starts
+    saveHistory();
+    
     const startX = e.clientX;
     const mask = blurMasks[index];
     const originalStart = parseTimeToSeconds(mask.startTime);
@@ -136,7 +163,7 @@ export default function TimelineWorkspace({ videoRef }) {
     
     const handleMouseMove = (moveEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const deltaSeconds = deltaX / 50; // 50px = 1 second
+      const deltaSeconds = deltaX / pixelsPerSecond;
       
       if (edge === 'left') {
         const newStart = Math.max(0, Math.min(originalEnd - 0.2, originalStart + deltaSeconds));
@@ -160,6 +187,101 @@ export default function TimelineWorkspace({ videoRef }) {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const handleTimelineBlockDragMouseDown = (index, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    saveHistory();
+    
+    const startX = e.clientX;
+    const sub = subtitles[index];
+    const originalStart = parseTimeToSeconds(sub.startTime);
+    const originalEnd = parseTimeToSeconds(sub.endTime);
+    const blockDuration = originalEnd - originalStart;
+
+    let hasDragged = false;
+    
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      if (Math.abs(deltaX) > 2) {
+        hasDragged = true;
+      }
+      const deltaSeconds = deltaX / pixelsPerSecond;
+      
+      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, originalStart + deltaSeconds));
+      const newEnd = newStart + blockDuration;
+      
+      setSubtitles(subtitles.map((item, idx) => 
+        idx === index ? { 
+          ...item, 
+          startTime: formatSecondsToCustomTime(newStart), 
+          endTime: formatSecondsToCustomTime(newEnd) 
+        } : item
+      ));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      
+      if (!hasDragged) {
+        setActiveSubtitleIndex(index);
+        handleSeek(originalStart);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleBlurBlockDragMouseDown = (index, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    saveHistory();
+    
+    const startX = e.clientX;
+    const mask = blurMasks[index];
+    const originalStart = parseTimeToSeconds(mask.startTime);
+    const originalEnd = parseTimeToSeconds(mask.endTime);
+    const blockDuration = originalEnd - originalStart;
+
+    let hasDragged = false;
+    
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      if (Math.abs(deltaX) > 2) {
+        hasDragged = true;
+      }
+      const deltaSeconds = deltaX / pixelsPerSecond;
+      
+      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, originalStart + deltaSeconds));
+      const newEnd = newStart + blockDuration;
+      
+      setBlurMasks(blurMasks.map((item, idx) => 
+        idx === index ? { 
+          ...item, 
+          startTime: formatSecondsToCustomTime(newStart), 
+          endTime: formatSecondsToCustomTime(newEnd) 
+        } : item
+      ));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      
+      if (!hasDragged) {
+        setActiveBlurIndex(index);
+        setInspectorTab('mask');
+        handleSeek(originalStart);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   const handleSeek = (time) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
@@ -171,7 +293,25 @@ export default function TimelineWorkspace({ videoRef }) {
     <div className="timeline-container">
       {/* Fixed Left Labels Column */}
       <div className="timeline-labels-column">
-        <div className="timeline-label-header"></div>
+        <div className="timeline-label-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '0 4px' }}>
+          <button 
+            className="zoom-btn" 
+            title="Thu nhỏ timeline (Alt + Cuộn chuột lùi)" 
+            onClick={() => setPixelsPerSecond(Math.max(pixelsPerSecond - 10, 20))}
+            style={{ background: 'none', border: 'none', color: '#a0a0a0', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+          >
+            ➖
+          </button>
+          <span style={{ fontSize: '10px', color: '#a0a0a0', userSelect: 'none' }}>Zoom</span>
+          <button 
+            className="zoom-btn" 
+            title="Phóng to timeline (Alt + Cuộn chuột tiến)" 
+            onClick={() => setPixelsPerSecond(Math.min(pixelsPerSecond + 10, 150))}
+            style={{ background: 'none', border: 'none', color: '#a0a0a0', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+          >
+            ➕
+          </button>
+        </div>
         <div className="timeline-label-item" style={{ cursor: 'pointer' }} onClick={() => setInspectorTab('video')}>Video</div>
         <div className="timeline-label-item">Phụ Đề dịch</div>
         <div className="timeline-label-item">Lồng Tiếng</div>
@@ -180,12 +320,12 @@ export default function TimelineWorkspace({ videoRef }) {
 
       {/* Scrollable Right Tracks Container */}
       <div className="timeline-scroll-container" ref={timelineRef} onMouseDown={handleTimelineMouseDown}>
-        <div className="timeline-tracks">
+        <div className="timeline-tracks" style={{ width: `${Math.max(100, (videoDuration || 30) * pixelsPerSecond + 200)}px` }}>
           {/* Timeline rulers */}
           <div className="timeline-ruler">
             {Array.from({ length: Math.ceil(videoDuration || 30) }).map((_, i) => (
               i % 5 === 0 ? (
-                <div key={i} className="ruler-tick" style={{ left: `${i * 50}px` }}>
+                <div key={i} className="ruler-tick" style={{ left: `${i * pixelsPerSecond}px` }}>
                   <span className="ruler-label">{formatTime(i)}</span>
                 </div>
               ) : null
@@ -196,7 +336,7 @@ export default function TimelineWorkspace({ videoRef }) {
           <div className="timeline-track-content">
             <div 
               className="timeline-block video" 
-              style={{ left: 0, width: `${(videoDuration || 30) * 50}px`, cursor: 'pointer' }}
+              style={{ left: 0, width: `${(videoDuration || 30) * pixelsPerSecond}px`, cursor: 'pointer' }}
               onClick={() => setInspectorTab('video')}
             >
               Băng Video Gốc ({formatTime(videoDuration)})
@@ -213,11 +353,8 @@ export default function TimelineWorkspace({ videoRef }) {
                 <div 
                   key={i}
                   className={`timeline-block subtitle ${activeSubtitleIndex === i ? 'active' : ''}`}
-                  style={{ left: `${start * 50}px`, width: `${duration * 50}px` }}
-                  onClick={() => {
-                    setActiveSubtitleIndex(i);
-                    handleSeek(start);
-                  }}
+                  style={{ left: `${start * pixelsPerSecond}px`, width: `${duration * pixelsPerSecond}px` }}
+                  onMouseDown={(e) => handleTimelineBlockDragMouseDown(i, e)}
                   title={sub.text}
                 >
                   <div className="timeline-block-resize-handle left" onMouseDown={(e) => handleTimelineBlockResizeMouseDown(i, 'left', e)}></div>
@@ -238,11 +375,8 @@ export default function TimelineWorkspace({ videoRef }) {
                 <div 
                   key={i}
                   className={`timeline-block audio ${activeSubtitleIndex === i ? 'active' : ''}`}
-                  style={{ left: `${start * 50}px`, width: `${duration * 50}px` }}
-                  onClick={() => {
-                    setActiveSubtitleIndex(i);
-                    handleSeek(start);
-                  }}
+                  style={{ left: `${start * pixelsPerSecond}px`, width: `${duration * pixelsPerSecond}px` }}
+                  onMouseDown={(e) => handleTimelineBlockDragMouseDown(i, e)}
                   title={`TTS: ${sub.text}`}
                 >
                   <div className="timeline-block-resize-handle left" onMouseDown={(e) => handleTimelineBlockResizeMouseDown(i, 'left', e)}></div>
@@ -264,16 +398,12 @@ export default function TimelineWorkspace({ videoRef }) {
                   key={mask.id || i}
                   className={`timeline-block blur ${activeBlurIndex === i ? 'active' : ''}`}
                   style={{ 
-                    left: `${start * 50}px`, 
-                    width: `${duration * 50}px`,
+                    left: `${start * pixelsPerSecond}px`, 
+                    width: `${duration * pixelsPerSecond}px`,
                     background: activeBlurIndex === i ? 'var(--accent-glow)' : 'rgba(16, 185, 129, 0.25)',
                     border: activeBlurIndex === i ? '1.5px solid var(--accent)' : '1px solid rgba(16, 185, 129, 0.4)'
                   }}
-                  onClick={() => {
-                    setActiveBlurIndex(i);
-                    setInspectorTab('mask');
-                    handleSeek(start);
-                  }}
+                  onMouseDown={(e) => handleBlurBlockDragMouseDown(i, e)}
                   title={`Làm mờ (${mask.yPercentage}%)`}
                 >
                   <div className="timeline-block-resize-handle left" onMouseDown={(e) => handleBlurBlockResizeMouseDown(i, 'left', e)}></div>
@@ -285,7 +415,7 @@ export default function TimelineWorkspace({ videoRef }) {
           </div>
 
           {/* Red Playhead line */}
-          <div className="timeline-playhead" style={{ left: `${currentTime * 50}px` }}>
+          <div className="timeline-playhead" style={{ left: `${currentTime * pixelsPerSecond}px` }}>
             <div className="timeline-playhead-cap"></div>
           </div>
         </div>

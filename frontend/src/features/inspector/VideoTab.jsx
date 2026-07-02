@@ -8,7 +8,8 @@ export default function VideoTab() {
     setVideoTransform,
     cropStyle,
     setCropStyle,
-    showToast
+    showToast,
+    saveHistory
   } = useProjectStore();
 
   const { videoDimensions } = usePlaybackStore();
@@ -29,6 +30,7 @@ export default function VideoTab() {
             min="50" 
             max="300" 
             value={videoTransform.zoom}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, zoom: parseInt(e.target.value) || 100 }))}
             className="volume-range-slider"
             style={{ flex: 1 }}
@@ -38,6 +40,7 @@ export default function VideoTab() {
             min="50"
             max="300"
             value={videoTransform.zoom}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, zoom: Math.max(50, Math.min(300, parseInt(e.target.value) || 100)) }))}
             style={{
               width: '60px',
@@ -65,6 +68,7 @@ export default function VideoTab() {
             min="-100" 
             max="100" 
             value={videoTransform.xOffset}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, xOffset: parseInt(e.target.value) || 0 }))}
             className="volume-range-slider"
             style={{ flex: 1 }}
@@ -74,6 +78,7 @@ export default function VideoTab() {
             min="-100"
             max="100"
             value={videoTransform.xOffset}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, xOffset: Math.max(-100, Math.min(100, parseInt(e.target.value) || 0)) }))}
             style={{
               width: '60px',
@@ -101,6 +106,7 @@ export default function VideoTab() {
             min="-100" 
             max="100" 
             value={videoTransform.yOffset}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, yOffset: parseInt(e.target.value) || 0 }))}
             className="volume-range-slider"
             style={{ flex: 1 }}
@@ -110,6 +116,7 @@ export default function VideoTab() {
             min="-100"
             max="100"
             value={videoTransform.yOffset}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, yOffset: Math.max(-100, Math.min(100, parseInt(e.target.value) || 0)) }))}
             style={{
               width: '60px',
@@ -137,6 +144,7 @@ export default function VideoTab() {
             min="-180" 
             max="180" 
             value={videoTransform.rotation}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, rotation: parseInt(e.target.value) || 0 }))}
             className="volume-range-slider"
             style={{ flex: 1 }}
@@ -146,6 +154,7 @@ export default function VideoTab() {
             min="-180"
             max="180"
             value={videoTransform.rotation}
+            onMouseDown={saveHistory}
             onChange={(e) => setVideoTransform(prev => ({ ...prev, rotation: Math.max(-180, Math.min(180, parseInt(e.target.value) || 0)) }))}
             style={{
               width: '60px',
@@ -191,6 +200,7 @@ export default function VideoTab() {
                 transition: 'all 0.2s'
               }}
               onClick={() => {
+                saveHistory();
                 const targetRatio = ratio.id === '9:16' ? 9/16 :
                                     ratio.id === '16:9' ? 16/9 : 1.0;
                 const videoRatio = videoDimensions.width / videoDimensions.height || 16/9;

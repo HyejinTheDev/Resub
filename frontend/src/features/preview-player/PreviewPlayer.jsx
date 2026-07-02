@@ -18,7 +18,8 @@ export default function PreviewPlayer({ videoRef }) {
     setSubtitleStyle,
     subtitles,
     activeSubtitleIndex,
-    setInspectorTab
+    setInspectorTab,
+    saveHistory
   } = useProjectStore();
 
   const {
@@ -57,6 +58,30 @@ export default function PreviewPlayer({ videoRef }) {
       videoRef.current.play();
     }
     setIsPlaying(!isPlaying);
+
+    // Focus the translation input of the currently active subtitle card in the left panel
+    if (activeSubtitleIndex !== -1) {
+      setTimeout(() => {
+        const activeInput = document.getElementById(`sub-input-${activeSubtitleIndex}`);
+        if (activeInput) {
+          activeInput.focus();
+          activeInput.select();
+        }
+      }, 50);
+    }
+  };
+
+  const handleCenterPanelClick = (e) => {
+    // If user clicks the background panel itself or the video container
+    if (e.target.className === 'center-panel' || e.target.className === 'video-container') {
+      if (activeSubtitleIndex !== -1) {
+        const activeInput = document.getElementById(`sub-input-${activeSubtitleIndex}`);
+        if (activeInput) {
+          activeInput.focus();
+          activeInput.select();
+        }
+      }
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -97,6 +122,7 @@ export default function PreviewPlayer({ videoRef }) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isDraggingCropRef.current = true;
     
     const startX = e.clientX;
@@ -147,6 +173,7 @@ export default function PreviewPlayer({ videoRef }) {
   const handleCropResizeMouseDown = (corner, e) => {
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isResizingCropRef.current = true;
     
     const startX = e.clientX;
@@ -214,6 +241,7 @@ export default function PreviewPlayer({ videoRef }) {
     e.stopPropagation();
     e.preventDefault();
     setActiveBlurIndex(index);
+    saveHistory();
     
     isDraggingMaskRef.current = true;
     
@@ -258,6 +286,7 @@ export default function PreviewPlayer({ videoRef }) {
   const handleMaskCornerResizeMouseDown = (index, corner, e) => {
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isResizingMaskCornerRef.current = true;
     
     const startX = e.clientX;
@@ -319,6 +348,7 @@ export default function PreviewPlayer({ videoRef }) {
   const handleMaskEdgeResizeMouseDown = (index, edge, e) => {
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isResizingMaskRef.current = true;
     
     const startX = e.clientX;
@@ -378,6 +408,7 @@ export default function PreviewPlayer({ videoRef }) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isDraggingTextRef.current = true;
     
     const startX = e.clientX;
@@ -423,6 +454,7 @@ export default function PreviewPlayer({ videoRef }) {
   const handleTextCornerResizeMouseDown = (corner, e) => {
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isResizingTextRef.current = true;
     
     const startX = e.clientX;
@@ -471,6 +503,7 @@ export default function PreviewPlayer({ videoRef }) {
   const handleTextEdgeResizeMouseDown = (edge, e) => {
     e.stopPropagation();
     e.preventDefault();
+    saveHistory();
     isResizingWidthRef.current = true;
 
     const startX = e.clientX;
@@ -515,7 +548,7 @@ export default function PreviewPlayer({ videoRef }) {
   });
 
   return (
-    <section className="center-panel" style={{ width: '100%', height: '100%' }}>
+    <section className="center-panel" style={{ width: '100%', height: '100%' }} onClick={handleCenterPanelClick}>
       <div className="video-container" style={{ aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` }}>
         <video 
           src={videoData.videoUrl}

@@ -10,7 +10,8 @@ export default function MaskTab() {
     blurMasks,
     setBlurMasks,
     handleDeleteBlurMask,
-    handleAddBlurMask
+    handleAddBlurMask,
+    saveHistory
   } = useProjectStore();
 
   const { currentTime, videoDuration } = usePlaybackStore();
@@ -78,6 +79,7 @@ export default function MaskTab() {
                     min="5" 
                     max="95" 
                     value={blurMasks[activeBlurIndex].yPercentage}
+                    onMouseDown={saveHistory}
                     onChange={(e) => {
                       const val = Math.max(5, Math.min(95, parseInt(e.target.value) || 0));
                       updateActiveMask('yPercentage', val);
@@ -92,6 +94,7 @@ export default function MaskTab() {
                 min="5"
                 max="95"
                 value={blurMasks[activeBlurIndex].yPercentage}
+                onMouseDown={saveHistory}
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
                   updateActiveMask('yPercentage', val);
@@ -109,6 +112,7 @@ export default function MaskTab() {
                     min="5" 
                     max="50" 
                     value={blurMasks[activeBlurIndex].heightPercentage}
+                    onMouseDown={saveHistory}
                     onChange={(e) => {
                       const val = Math.max(5, Math.min(50, parseInt(e.target.value) || 0));
                       updateActiveMask('heightPercentage', val);
@@ -123,6 +127,7 @@ export default function MaskTab() {
                 min="5"
                 max="50"
                 value={blurMasks[activeBlurIndex].heightPercentage}
+                onMouseDown={saveHistory}
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
                   updateActiveMask('heightPercentage', val);
@@ -140,6 +145,7 @@ export default function MaskTab() {
                     min="2" 
                     max="50" 
                     value={blurMasks[activeBlurIndex].blurRadius}
+                    onMouseDown={saveHistory}
                     onChange={(e) => {
                       const val = Math.max(2, Math.min(50, parseInt(e.target.value) || 0));
                       updateActiveMask('blurRadius', val);
@@ -154,6 +160,7 @@ export default function MaskTab() {
                 min="2"
                 max="50"
                 value={blurMasks[activeBlurIndex].blurRadius}
+                onMouseDown={saveHistory}
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
                   updateActiveMask('blurRadius', val);
@@ -170,7 +177,10 @@ export default function MaskTab() {
                     key={c.value}
                     className={`color-preset-circle ${blurMasks[activeBlurIndex].color === c.value ? 'active' : ''}`}
                     style={{ backgroundColor: c.value }}
-                    onClick={() => updateActiveMask('color', c.value)}
+                    onClick={() => {
+                      saveHistory();
+                      updateActiveMask('color', c.value);
+                    }}
                     title={c.name}
                   />
                 ))}
@@ -179,6 +189,7 @@ export default function MaskTab() {
                   <input 
                     type="color" 
                     value={blurMasks[activeBlurIndex].color}
+                    onMouseDown={saveHistory}
                     onChange={(e) => updateActiveMask('color', e.target.value)}
                     className="custom-color-picker-input"
                   />
@@ -196,6 +207,7 @@ export default function MaskTab() {
                     min="0" 
                     max="100" 
                     value={Math.round(blurMasks[activeBlurIndex].opacity * 100)}
+                    onMouseDown={saveHistory}
                     onChange={(e) => {
                       const val = Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) / 100;
                       updateActiveMask('opacity', val);
@@ -211,6 +223,7 @@ export default function MaskTab() {
                 max="1"
                 step="0.05"
                 value={blurMasks[activeBlurIndex].opacity}
+                onMouseDown={saveHistory}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   updateActiveMask('opacity', val);

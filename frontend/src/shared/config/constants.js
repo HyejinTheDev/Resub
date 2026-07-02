@@ -1,11 +1,6 @@
 export const VOICES = [
   { id: 'vi-VN-HoaiMyNeural', name: 'Hoài My (Edge Nữ - Nam)' },
   { id: 'vi-VN-NamMinhNeural', name: 'Nam Minh (Edge Nam - Nam)' },
-  { id: 'fpt-banmai', name: 'Ban Mai (FPT Nữ - Bắc - Cần Key)' },
-  { id: 'fpt-leminh', name: 'Lê Minh (FPT Nam - Bắc - Cần Key)' },
-  { id: 'fpt-thuha', name: 'Thu Hà (FPT Nữ - Bắc - Cần Key)' },
-  { id: 'fpt-myan', name: 'Mỹ An (FPT Nữ - Nam - Cần Key)' },
-  { id: 'fpt-giahuy', name: 'Gia Huy (FPT Nam - Trung - Cần Key)' },
   { id: 'capcut-cogaihoatngon', name: 'Cô Gái Hoạt Ngôn (CapCut - Cần Cookie)' },
   { id: 'capcut-nhongotngao', name: 'Nhỏ Ngọt Ngào (CapCut - Cần Cookie)' },
   { id: 'capcut-nuphothong', name: 'Nữ Phổ Thông (CapCut - Cần Cookie)' },

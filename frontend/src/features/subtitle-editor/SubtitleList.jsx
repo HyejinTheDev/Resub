@@ -1,6 +1,7 @@
 import React from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { usePlaybackStore } from '../../store/usePlaybackStore';
 import { VOICES, API_BASE_URL } from '../../shared/config/constants';
 import { parseTimeToSeconds } from '../../shared/utils/timeFormatter';
 
@@ -15,10 +16,38 @@ export default function SubtitleList({ onSeek }) {
     handleSubtitleVoiceChange,
     previewLoadingIndex,
     setPreviewLoadingIndex,
-    showToast
+    showToast,
+    saveHistory,
+    handleDeleteSubtitle,
+    setInspectorTab,
+    handleAddSubtitle
   } = useProjectStore();
 
-  const { fptApiKey, capcutCookie } = useSettingsStore();
+  const { capcutCookie } = useSettingsStore();
+  const { ttsVolume, currentTime, defaultVoice } = usePlaybackStore();
+
+  const handleAddNewSubtitleClick = () => {
+    handleAddSubtitle(currentTime, defaultVoice);
+    showToast('Đã thêm câu lời thoại mới tại thời điểm phát hiện tại!');
+  };
+
+  const handleKeyDown = (index, e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const inputs = document.querySelectorAll('.translation-input');
+      const currentInput = e.target;
+      const inputsArray = Array.from(inputs);
+      const currentPos = inputsArray.indexOf(currentInput);
+      if (currentPos !== -1 && currentPos < inputsArray.length - 1) {
+        inputsArray[currentPos + 1].focus();
+        inputsArray[currentPos + 1].select();
+      }
+    }
+  };
+
+  const handleFocus = () => {
+    saveHistory();
+  };
 
   const handlePreviewVoice = async (index, e) => {
     e.stopPropagation();
@@ -36,7 +65,6 @@ export default function SubtitleList({ onSeek }) {
         body: JSON.stringify({
           text: sub.text,
           voice: sub.voice,
-          fptApiKey,
           capcutCookie
         })
       });
@@ -48,6 +76,7 @@ export default function SubtitleList({ onSeek }) {
 
       const data = await response.json();
       const audio = new Audio(data.audioUrl);
+      audio.volume = ttsVolume;
       await audio.play();
     } catch (error) {
       showToast(`Nghe thử thất bại: ${error.message}`);
@@ -83,11 +112,33 @@ export default function SubtitleList({ onSeek }) {
 
   return (
     <section className="left-panel" style={{ width: '100%', height: '100%' }}>
-      <div className="panel-header">
+      <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="panel-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           Danh sách phụ đề dịch thuật ({subtitles.length} câu)
         </span>
+        <button 
+          onClick={handleAddNewSubtitleClick}
+          className="action-btn"
+          style={{
+            padding: '6px 12px',
+            fontSize: '12px',
+            background: 'var(--accent)',
+            color: '#000',
+            border: 'none',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            transition: 'opacity 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+          onMouseLeave={(e) => e.target.style.opacity = '1'}
+        >
+          ➕ Thêm câu
+        </button>
       </div>
 
       <div className="search-bar-container">
@@ -116,18 +167,47 @@ export default function SubtitleList({ onSeek }) {
               onClick={() => {
                 setActiveSubtitleIndex(i);
                 onSeek(parseTimeToSeconds(sub.startTime));
+                setInspectorTab('audio');
               }}
             >
-              <div className="card-metadata">
-                <span className="card-index">Câu {i + 1}</span>
-                <span>{sub.startTime} - {sub.endTime}</span>
+              <div className="card-metadata" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="card-index">Câu {i + 1}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sub.startTime} - {sub.endTime}</span>
+                </div>
+                <button
+                  className="delete-sub-btn"
+                  title="Xóa câu phụ đề & giọng lồng tiếng"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteSubtitle(i);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  🗑️
+                </button>
               </div>
               <div className="chinese-text">{sub.chineseText}</div>
               <input 
                 type="text" 
+                id={`sub-input-${i}`}
                 className="translation-input"
                 value={sub.text}
                 onChange={(e) => handleSubtitleTextChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                onFocus={handleFocus}
               />
               <div className="voice-select-container">
                 <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>

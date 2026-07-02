@@ -2,12 +2,12 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
 const { downloadVideo } = require('../services/downloader');
 const { uploadFileToGemini, waitForFileProcessing, deleteGeminiFile, transcribeAndTranslate } = require('../services/geminiService');
-const { exportDubbedVideo, generateTTS } = require('../services/dubbingEngine');
+const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
 
 const router = express.Router();
 
@@ -149,43 +149,101 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   }
 });
 
-// 3. Transcribe & Translate
+// Initialize progress tracking map
+global.transcribeProgress = global.transcribeProgress || {};
+
+// 3. Transcribe & Translate (Async Background Task)
 router.post('/transcribe', async (req, res) => {
-  const { audioPath, geminiKey } = req.body;
-  if (!audioPath || !geminiKey) {
-    return res.status(400).json({ error: 'audioPath and geminiKey are required' });
+  const { audioPath, geminiKey, taskId } = req.body;
+  if (!audioPath || !geminiKey || !taskId) {
+    return res.status(400).json({ error: 'audioPath, geminiKey, and taskId are required' });
   }
 
   if (!fs.existsSync(audioPath)) {
     return res.status(404).json({ error: `Audio file not found at path: ${audioPath}` });
   }
 
-  console.log(`[api/transcribe] Uploading and transcribing ${audioPath}...`);
+  console.log(`[api/transcribe] Starting background transcription task: ${taskId} for ${audioPath}`);
+  
+  // Initialize progress
+  global.transcribeProgress[taskId] = { 
+    status: 'uploading', 
+    percent: 15, 
+    message: 'Gửi âm thanh lên máy chủ Google AI...' 
+  };
 
-  try {
-    const fileInfo = await uploadFileToGemini(audioPath, 'audio/mp3', geminiKey);
-    console.log(`[api/transcribe] Uploaded to Google: ${fileInfo.name}`);
+  // Start background process
+  (async () => {
+    try {
+      // Step 1: Upload to Gemini Files API
+      const fileInfo = await uploadFileToGemini(audioPath, 'audio/mp3', geminiKey);
+      console.log(`[api/transcribe] Uploaded to Google: ${fileInfo.name}`);
 
-    await waitForFileProcessing(fileInfo.name, geminiKey);
+      // Update progress
+      global.transcribeProgress[taskId] = { 
+        status: 'processing', 
+        percent: 45, 
+        message: 'Google AI đang phân tích tệp âm thanh...' 
+      };
 
-    const subtitles = await transcribeAndTranslate(fileInfo.uri, geminiKey);
-    console.log(`[api/transcribe] Successfully generated ${subtitles.length} segments`);
+      // Step 2: Wait for file processing
+      await waitForFileProcessing(fileInfo.name, geminiKey);
 
-    deleteGeminiFile(fileInfo.name, geminiKey).catch(() => {});
+      // Update progress
+      global.transcribeProgress[taskId] = { 
+        status: 'transcribing', 
+        percent: 75, 
+        message: 'Gemini AI đang nhận dạng tiếng Trung & biên dịch phụ đề...' 
+      };
 
-    res.json({
-      success: true,
-      subtitles
-    });
-  } catch (error) {
-    console.error('[api/transcribe] Error:', error.message);
-    res.status(500).json({ error: error.message });
+      // Step 3: Call model
+      const subtitles = await transcribeAndTranslate(fileInfo.uri, geminiKey);
+      console.log(`[api/transcribe] Task ${taskId} successfully generated ${subtitles.length} segments`);
+
+      // Clean up remote file
+      deleteGeminiFile(fileInfo.name, geminiKey).catch(() => {});
+
+      // Final progress update
+      global.transcribeProgress[taskId] = { 
+        status: 'done', 
+        percent: 100, 
+        subtitles 
+      };
+    } catch (error) {
+      console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
+      global.transcribeProgress[taskId] = { 
+        status: 'error', 
+        percent: 100, 
+        error: error.message 
+      };
+    }
+  })();
+
+  // Return immediately with taskId
+  res.json({
+    success: true,
+    taskId
+  });
+});
+
+// Endpoint to poll transcription progress status
+router.get('/transcribe-status', (req, res) => {
+  const { taskId } = req.query;
+  if (!taskId) {
+    return res.status(400).json({ error: 'taskId is required' });
   }
+
+  const progress = global.transcribeProgress[taskId];
+  if (!progress) {
+    return res.status(404).json({ error: 'Task not found' });
+  }
+
+  res.json(progress);
 });
 
 // 4. Dub & Export
 router.post('/dub', async (req, res) => {
-  const { videoPath, subtitles, voice, bgVolume, blurMask, blurMasks, subtitleStyle, fptApiKey, capcutCookie, cropStyle, videoTransform } = req.body;
+  const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
@@ -201,13 +259,15 @@ router.post('/dub', async (req, res) => {
       voice: voice || 'vi-VN-HoaiMyNeural',
       outputPath,
       bgVolume: bgVolume !== undefined ? parseFloat(bgVolume) : 0.15,
+      ttsVolume: ttsVolume !== undefined ? parseFloat(ttsVolume) : 1.0,
       blurMask,
       blurMasks,
       subtitleStyle,
-      fptApiKey,
       capcutCookie,
       cropStyle,
-      videoTransform
+      videoTransform,
+      exportResolution,
+      exportQuality
     });
 
     const PORT = process.env.PORT || 3051;
@@ -225,7 +285,7 @@ router.post('/dub', async (req, res) => {
 
 // 5. TTS Preview
 router.post('/tts-preview', async (req, res) => {
-  const { text, voice, fptApiKey, capcutCookie } = req.body;
+  const { text, voice, capcutCookie } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
@@ -237,7 +297,7 @@ router.post('/tts-preview', async (req, res) => {
   const outputPath = path.join(TEMP_TTS_DIR, filename);
 
   try {
-    await generateTTS(text, voiceName, outputPath, fptApiKey, capcutCookie);
+    await generateTTS(text, voiceName, outputPath, capcutCookie);
 
     const PORT = process.env.PORT || 3051;
     res.json({
@@ -246,6 +306,119 @@ router.post('/tts-preview', async (req, res) => {
     });
   } catch (error) {
     console.error('[api/tts-preview] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. Split Long Video into Segments
+router.post('/split-video', upload.single('video'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Video file is required' });
+  }
+
+  const segmentMinutes = parseFloat(req.body.segmentMinutes) || 5.0;
+  const segmentSeconds = segmentMinutes * 60;
+
+  const videoPath = req.file.path;
+  const videoExt = path.extname(req.file.originalname) || '.mp4';
+  const originalName = path.basename(req.file.originalname, videoExt);
+  
+  const splitDirName = `split_${uuidv4()}`;
+  const splitDirPath = path.join(DOWNLOADS_DIR, 'exports', splitDirName);
+  fs.mkdirSync(splitDirPath, { recursive: true });
+
+  const ffmpeg = getFfmpegCommand();
+  const ffprobe = getFfprobeCommand();
+
+  try {
+    // 1. Get original video duration using ffprobe
+    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const originalDuration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
+
+    // 2. Perform splitting
+    const outputPattern = path.join(splitDirPath, `part_%03d${videoExt}`);
+    
+    // Command: ffmpeg -i input -f segment -segment_time S -reset_timestamps 1 -c copy -map 0 output_%03d.mp4
+    // We execute this synchronously
+    const { execSync: cpExecSync } = require('child_process');
+    const splitCmd = `"${ffmpeg}" -y -i "${videoPath}" -f segment -segment_time ${segmentSeconds} -reset_timestamps 1 -c copy -map 0 "${outputPattern}"`;
+    cpExecSync(splitCmd);
+
+    // 3. Read output files
+    const files = fs.readdirSync(splitDirPath);
+    const segments = [];
+
+    const PORT = process.env.PORT || 3051;
+    
+    // Sort files to keep correct order
+    files.sort().forEach((file, index) => {
+      const filePath = path.join(splitDirPath, file);
+      
+      // Get segment duration
+      const segDurationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
+      const duration = parseFloat(cpExecSync(segDurationCmd).toString().trim()) || 0;
+
+      const fileUrl = `http://localhost:${PORT}/downloads/exports/${splitDirName}/${file}`;
+      
+      segments.push({
+        index,
+        fileName: `${originalName}_Phần_${index + 1}${videoExt}`,
+        duration,
+        url: fileUrl,
+        filePath
+      });
+    });
+
+    // Cleanup uploaded temp video
+    try {
+      fs.unlinkSync(videoPath);
+    } catch (err) {
+      console.warn('Failed to delete temp video upload:', err.message);
+    }
+
+    res.json({
+      success: true,
+      originalName,
+      originalDuration,
+      segments
+    });
+  } catch (error) {
+    console.error('Error splitting video:', error);
+    res.status(500).json({ error: `Splitting failed: ${error.message}` });
+  }
+});
+
+// 7. Load Split Segment as new Project
+router.post('/load-split-segment', async (req, res) => {
+  const { filePath } = req.body;
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(400).json({ error: 'Valid filePath is required' });
+  }
+
+  const videoId = uuidv4();
+  const videoExt = path.extname(filePath);
+  
+  // Copy the split file into downloads/videos
+  const targetVideoPath = path.join(VIDEOS_DIR, `${videoId}${videoExt}`);
+  fs.copyFileSync(filePath, targetVideoPath);
+
+  // Extract audio
+  const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
+  
+  try {
+    await extractAudio(targetVideoPath, audioPath);
+
+    const PORT = process.env.PORT || 3051;
+    res.json({
+      success: true,
+      videoId,
+      videoUrl: `http://localhost:${PORT}/downloads/videos/${videoId}${videoExt}`,
+      audioUrl: `http://localhost:${PORT}/downloads/audios/${videoId}.mp3`,
+      videoPath: targetVideoPath,
+      audioPath
+    });
+  } catch (error) {
+    console.error('Failed to load split segment:', error);
     res.status(500).json({ error: error.message });
   }
 });

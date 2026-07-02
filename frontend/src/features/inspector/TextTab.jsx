@@ -8,7 +8,8 @@ export default function TextTab() {
     setSubtitles,
     activeSubtitleIndex,
     subtitleStyle,
-    setSubtitleStyle
+    setSubtitleStyle,
+    saveHistory
   } = useProjectStore();
 
   return (
@@ -35,6 +36,7 @@ export default function TextTab() {
                 fontFamily: 'inherit'
               }}
               value={subtitles[activeSubtitleIndex].text}
+              onFocus={saveHistory}
               onChange={(e) => {
                 const newText = e.target.value;
                 setSubtitles(subtitles.map((sub, idx) => 
@@ -53,6 +55,7 @@ export default function TextTab() {
                   min="10" 
                   max="60" 
                   value={subtitleStyle.fontSize}
+                  onMouseDown={saveHistory}
                   onChange={(e) => setSubtitleStyle(prev => ({ ...prev, fontSize: Math.max(10, Math.min(60, parseInt(e.target.value) || 0)) }))}
                   className="mask-number-input"
                 />
@@ -64,6 +67,7 @@ export default function TextTab() {
               min="10"
               max="60"
               value={subtitleStyle.fontSize}
+              onMouseDown={saveHistory}
               onChange={(e) => setSubtitleStyle(prev => ({ ...prev, fontSize: parseInt(e.target.value) }))}
               className="volume-range-slider"
             />
@@ -91,15 +95,18 @@ export default function TextTab() {
                     justifyContent: 'center',
                     transition: 'all 0.2s'
                   }}
-                  onClick={() => setSubtitleStyle(prev => ({
-                    ...prev,
-                    textColorPreset: preset.id,
-                    color: preset.color,
-                    outlineColor: preset.outlineColor,
-                    outlineWidth: preset.outlineWidth,
-                    bg: preset.bg,
-                    shadow: preset.shadow
-                  }))}
+                  onClick={() => {
+                    saveHistory();
+                    setSubtitleStyle(prev => ({
+                      ...prev,
+                      textColorPreset: preset.id,
+                      color: preset.color,
+                      outlineColor: preset.outlineColor,
+                      outlineWidth: preset.outlineWidth,
+                      bg: preset.bg,
+                      shadow: preset.shadow
+                    }));
+                  }}
                 >
                   <span style={{
                     fontSize: '15px',
@@ -130,7 +137,10 @@ export default function TextTab() {
                 fontWeight: 'bold',
                 cursor: 'pointer'
               }}
-              onClick={() => setSubtitleStyle(prev => ({ ...prev, bold: !prev.bold }))}
+              onClick={() => {
+                saveHistory();
+                setSubtitleStyle(prev => ({ ...prev, bold: !prev.bold }));
+              }}
             >
               B
             </button>
@@ -146,7 +156,10 @@ export default function TextTab() {
                 fontStyle: 'italic',
                 cursor: 'pointer'
               }}
-              onClick={() => setSubtitleStyle(prev => ({ ...prev, italic: !prev.italic }))}
+              onClick={() => {
+                saveHistory();
+                setSubtitleStyle(prev => ({ ...prev, italic: !prev.italic }));
+              }}
             >
               I
             </button>
