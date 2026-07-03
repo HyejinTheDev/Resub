@@ -495,14 +495,18 @@ async function exportDubbedVideo({
       }
       
       const y = subtitleStyle.yPercent !== undefined ? subtitleStyle.yPercent : 85;
-      const marginV = Math.round((100 - y) / 100 * targetHeight);
+      // yPercent is the CENTER of the subtitle text (CSS translate(-50%, -50%))
+      // ASS Alignment=2 means bottom-center, MarginV = distance from bottom edge of video to bottom of text
+      // So MarginV = totalHeight - bottomOfText = totalHeight - (centerY + halfTextHeight)
+      // Approximate: MarginV = totalHeight * (1 - y/100) - assFontSize/2
+      const marginV = Math.max(0, Math.round(targetHeight * (1 - y / 100) - assFontSize / 2));
       forceStyle += `,MarginV=${marginV}`;
 
       const wPercent = subtitleStyle.widthPercent !== undefined ? subtitleStyle.widthPercent : 80;
       const marginH = Math.round(((100 - wPercent) / 2) / 100 * targetWidth);
       forceStyle += `,MarginL=${marginH},MarginR=${marginH}`;
     } else {
-      forceStyle += `,FontSize=30,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2`;
+      forceStyle += `,FontSize=30,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,MarginV=30`;
     }
 
     // Process blur segments on original video size
