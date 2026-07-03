@@ -34,6 +34,38 @@ export default function MaskTab() {
     handleAddBlurMask(newBlur);
   };
 
+  const createFullVideoBlurMask = () => {
+    const startSecs = 0;
+    const endSecs = videoDuration || 300;
+    const newBlur = {
+      id: `blur-${Date.now()}`,
+      startTime: formatSecondsToCustomTime(startSecs),
+      endTime: formatSecondsToCustomTime(endSecs),
+      xPercentage: 50,
+      yPercentage: 75,
+      widthPercentage: 80,
+      heightPercentage: 15,
+      blurRadius: 15,
+      color: '#000000',
+      opacity: 0.15
+    };
+    handleAddBlurMask(newBlur);
+  };
+
+  const setMaskToFullDuration = () => {
+    saveHistory();
+    const updatedMasks = blurMasks.map((m, idx) => 
+      idx === activeBlurIndex 
+        ? { 
+            ...m, 
+            startTime: formatSecondsToCustomTime(0), 
+            endTime: formatSecondsToCustomTime(videoDuration || 300) 
+          } 
+        : m
+    );
+    setBlurMasks(updatedMasks);
+  };
+
   const updateActiveMask = (field, value) => {
     setBlurMasks(blurMasks.map((m, idx) => 
       idx === activeBlurIndex ? { ...m, [field]: value } : m
@@ -65,8 +97,26 @@ export default function MaskTab() {
             </button>
           </div>
           
-          <div style={{background: 'var(--bg-tertiary)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '11px', color: 'var(--text-muted)'}}>
-            Thời gian: <strong>{blurMasks[activeBlurIndex].startTime}</strong> - <strong>{blurMasks[activeBlurIndex].endTime}</strong>
+          <div style={{background: 'var(--bg-tertiary)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+            <div>
+              Thời gian: <strong>{blurMasks[activeBlurIndex].startTime}</strong> - <strong>{blurMasks[activeBlurIndex].endTime}</strong>
+            </div>
+            <button
+              onClick={setMaskToFullDuration}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                border: '1px solid var(--border-color)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                alignSelf: 'flex-start'
+              }}
+            >
+              Kéo phủ toàn bộ video (0s - Hết) 📺
+            </button>
           </div>
 
           <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
@@ -240,21 +290,40 @@ export default function MaskTab() {
           <p style={{color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px'}}>
             💡 Chưa chọn phân đoạn làm mờ nào hoặc chưa tạo dải làm mờ!
           </p>
-          <button 
-            className="action-btn" 
-            onClick={createAndAddBlurMask}
-            style={{
-              background: 'var(--accent)',
-              color: '#000',
-              fontWeight: 'bold',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              cursor: 'pointer'
-            }}
-          >
-            Thêm làm mờ mới (+)
-          </button>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center'}}>
+            <button 
+              className="action-btn" 
+              onClick={createAndAddBlurMask}
+              style={{
+                width: '100%',
+                background: 'var(--accent)',
+                color: '#000',
+                fontWeight: 'bold',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '10px 16px',
+                cursor: 'pointer'
+              }}
+            >
+              Thêm làm mờ phân đoạn (+)
+            </button>
+            <button 
+              className="action-btn" 
+              onClick={createFullVideoBlurMask}
+              style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                fontWeight: 'bold',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '10px 16px',
+                cursor: 'pointer'
+              }}
+            >
+              Làm mờ toàn bộ video (0s - Hết) 📺
+            </button>
+          </div>
         </div>
       )}
     </div>
