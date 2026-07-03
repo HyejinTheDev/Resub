@@ -391,7 +391,8 @@ async function exportDubbedVideo({
   videoTransform,
   capcutCookie,
   exportResolution = 'original',
-  exportQuality = 'medium'
+  exportQuality = 'medium',
+  onProgress = () => {}
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -410,6 +411,12 @@ async function exportDubbedVideo({
       const originalDuration = (endMs - startMs) / 1000;
 
       if (originalDuration <= 0) continue;
+
+      // TTS generation covers 0-60% of overall progress
+      onProgress({
+        percent: Math.round((i / subtitles.length) * 60),
+        message: `Đang tạo giọng đọc câu ${i + 1}/${subtitles.length}...`
+      });
 
       const rawTtsPath = path.join(tempDir, `tts_${i}_raw.mp3`);
       const speedTtsPath = path.join(tempDir, `tts_${i}_speed.mp3`);
@@ -633,14 +640,33 @@ async function exportDubbedVideo({
 
     // 5. Run FFmpeg
     console.log(`[dubbingEngine] Running FFmpeg command with ${ttsFiles.length} TTS inputs...`);
+    onProgress({ percent: 60, message: 'Đang ghép âm thanh & chèn phụ đề vào video (FFmpeg)...' });
+
+    const videoDurationSec = (() => {
+      try { return getAudioDuration(videoPath) || 0; } catch { return 0; }
+    })();
+
     await new Promise((resolve, reject) => {
       const proc = spawn(ffmpeg, ffmpegArgs, { cwd: tempDir });
       let stderr = '';
       
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.stderr.on('data', (d) => {
+        const chunk = d.toString();
+        stderr += chunk;
+        // FFmpeg reports encode position as "time=HH:MM:SS.xx"; map it to 60-98%
+        const timeMatch = chunk.match(/time=(\d+):(\d+):(\d+)\.(\d+)/);
+        if (timeMatch && videoDurationSec > 0) {
+          const encodedSec = parseInt(timeMatch[1], 10) * 3600 + parseInt(timeMatch[2], 10) * 60 + parseInt(timeMatch[3], 10);
+          const ffmpegRatio = Math.min(encodedSec / videoDurationSec, 1);
+          onProgress({
+            percent: Math.round(60 + ffmpegRatio * 38),
+            message: `Đang xử lý video: ${Math.round(ffmpegRatio * 100)}% (FFmpeg)...`
+          });
+        }
+      });
       proc.on('close', (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr}`));
+        else reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 800)}`));
       });
     });
 

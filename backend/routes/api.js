@@ -459,16 +459,23 @@ router.get('/transcribe-status', (req, res) => {
   res.json(progress);
 });
 
-// 4. Dub & Export
-router.post('/dub', async (req, res) => {
+// 4. Dub & Export (Async background task — the HTTP request returns immediately
+// and the frontend polls /dub-status, so slow FFmpeg runs no longer hit proxy timeouts)
+global.dubProgress = global.dubProgress || {};
+
+router.post('/dub', (req, res) => {
   const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
 
+  if (!fs.existsSync(videoPath)) {
+    return res.status(404).json({ error: 'Không tìm thấy tệp video gốc trên máy chủ (có thể server vừa được deploy lại). Vui lòng tải video lên lại và làm lại từ đầu.' });
+  }
+
   const exportId = uuidv4();
   const outputPath = path.join(EXPORTS_DIR, `${exportId}.mp4`);
-  console.log(`[api/dub] Starting dubbing export for ${videoPath}...`);
+  console.log(`[api/dub] Starting background dubbing export ${exportId} for ${videoPath}...`);
 
   try {
     const ffprobe = getFfprobeCommand();
@@ -478,34 +485,63 @@ router.post('/dub', async (req, res) => {
     if (duration > 600) {
       return res.status(400).json({ error: 'Video xuất quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
     }
-
-    await exportDubbedVideo({
-      videoPath,
-      subtitles,
-      voice: voice || 'vi-VN-HoaiMyNeural',
-      outputPath,
-      bgVolume: bgVolume !== undefined ? parseFloat(bgVolume) : 0.15,
-      ttsVolume: ttsVolume !== undefined ? parseFloat(ttsVolume) : 1.0,
-      blurMask,
-      blurMasks,
-      subtitleStyle,
-      capcutCookie,
-      cropStyle,
-      videoTransform,
-      exportResolution,
-      exportQuality
-    });
-
-    res.json({
-      success: true,
-      exportId,
-      videoUrl: `/downloads/exports/${exportId}.mp4`,
-      outputPath
-    });
   } catch (error) {
-    console.error('[api/dub] Error:', error.message);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: `Không đọc được thông tin video: ${error.message}` });
   }
+
+  global.dubProgress[exportId] = { status: 'processing', percent: 0, message: 'Khởi tạo tác vụ xuất video...' };
+
+  (async () => {
+    try {
+      await exportDubbedVideo({
+        videoPath,
+        subtitles,
+        voice: voice || 'vi-VN-HoaiMyNeural',
+        outputPath,
+        bgVolume: bgVolume !== undefined ? parseFloat(bgVolume) : 0.15,
+        ttsVolume: ttsVolume !== undefined ? parseFloat(ttsVolume) : 1.0,
+        blurMask,
+        blurMasks,
+        subtitleStyle,
+        capcutCookie,
+        cropStyle,
+        videoTransform,
+        exportResolution,
+        exportQuality,
+        onProgress: ({ percent, message }) => {
+          global.dubProgress[exportId] = { status: 'processing', percent, message };
+        }
+      });
+
+      global.dubProgress[exportId] = {
+        status: 'done',
+        percent: 100,
+        videoUrl: `/downloads/exports/${exportId}.mp4`,
+        outputPath
+      };
+      console.log(`[api/dub] Export ${exportId} completed successfully.`);
+    } catch (error) {
+      console.error(`[api/dub] Export ${exportId} failed:`, error.message);
+      global.dubProgress[exportId] = { status: 'error', percent: 100, error: error.message };
+    }
+  })();
+
+  res.json({ success: true, exportId });
+});
+
+// Poll dubbing export progress
+router.get('/dub-status', (req, res) => {
+  const { exportId } = req.query;
+  if (!exportId) {
+    return res.status(400).json({ error: 'exportId is required' });
+  }
+
+  const progress = global.dubProgress[exportId];
+  if (!progress) {
+    return res.status(404).json({ error: 'Export task not found' });
+  }
+
+  res.json(progress);
 });
 
 // 5. TTS Preview

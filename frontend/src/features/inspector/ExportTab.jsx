@@ -25,6 +25,7 @@ export default function ExportTab() {
 
   const [exportResolution, setExportResolution] = useState('original');
   const [exportQuality, setExportQuality] = useState('medium');
+  const [exportProgress, setExportProgress] = useState(null);
 
   const getCropDimensions = () => {
     if (cropStyle.aspectRatio === 'original') {
@@ -111,10 +112,39 @@ export default function ExportTab() {
         throw new Error(err.error || 'Failed to export dubbed video');
       }
 
-      const data = await response.json();
-      setExportedVideoUrl(data.videoUrl);
+      const { exportId } = await response.json();
+
+      // Poll export progress until done/error (export runs in background on server)
+      const finalStatus = await new Promise((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const statusRes = await fetch(`${API_BASE_URL}/dub-status?exportId=${exportId}`);
+            if (!statusRes.ok) {
+              // Transient errors (e.g. 502 while server is busy) — keep polling
+              setTimeout(poll, 5000);
+              return;
+            }
+            const status = await statusRes.json();
+            if (status.status === 'done') {
+              resolve(status);
+            } else if (status.status === 'error') {
+              reject(new Error(status.error || 'Xuất video thất bại trên máy chủ'));
+            } else {
+              setExportProgress(status);
+              setTimeout(poll, 3000);
+            }
+          } catch {
+            setTimeout(poll, 5000);
+          }
+        };
+        poll();
+      });
+
+      setExportProgress(null);
+      setExportedVideoUrl(finalStatus.videoUrl);
       showToast('Xuất video lồng tiếng thành công! Bạn có thể tải video về.');
     } catch (error) {
+      setExportProgress(null);
       showToast(`Lỗi xuất video: ${error.message}`);
     } finally {
       setIsExporting(false);
@@ -181,14 +211,26 @@ export default function ExportTab() {
       )}
 
       {!exportedVideoUrl ? (
-        <button 
-          className="action-btn export-run-btn"
-          onClick={handleExportVideo}
-          disabled={isExporting}
-          style={{ width: '100%', padding: '12px', background: 'var(--accent)', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-        >
-          {isExporting ? 'Đang tổng hợp thuyết minh...' : 'Khởi chạy xuất video'}
-        </button>
+        <>
+          <button 
+            className="action-btn export-run-btn"
+            onClick={handleExportVideo}
+            disabled={isExporting}
+            style={{ width: '100%', padding: '12px', background: 'var(--accent)', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            {isExporting ? 'Đang tổng hợp thuyết minh...' : 'Khởi chạy xuất video'}
+          </button>
+          {isExporting && exportProgress && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${exportProgress.percent || 0}%`, background: 'var(--accent)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
+              </div>
+              <p style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                {exportProgress.percent || 0}% — {exportProgress.message || 'Đang xử lý...'}
+              </p>
+            </div>
+          )}
+        </>
       ) : (
         <div className="export-success-box" style={{ padding: '16px', background: 'rgba(34,197,94,0.05)', border: '1px solid var(--accent)', borderRadius: '8px', textAlign: 'center' }}>
           <p className="success-text" style={{ color: 'var(--accent)', fontWeight: 'bold', marginBottom: '16px' }}>🎉 Xuất video thành công!</p>
