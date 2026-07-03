@@ -462,6 +462,7 @@ router.get('/transcribe-status', (req, res) => {
 // 4. Dub & Export (Async background task — the HTTP request returns immediately
 // and the frontend polls /dub-status, so slow FFmpeg runs no longer hit proxy timeouts)
 global.dubProgress = global.dubProgress || {};
+global.dubTasks = global.dubTasks || {};
 
 router.post('/dub', (req, res) => {
   const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality } = req.body;
@@ -490,6 +491,8 @@ router.post('/dub', (req, res) => {
   }
 
   global.dubProgress[exportId] = { status: 'processing', percent: 0, message: 'Khởi tạo tác vụ xuất video...' };
+  const cancelToken = { cancelled: false, proc: null };
+  global.dubTasks[exportId] = cancelToken;
 
   (async () => {
     try {
@@ -509,8 +512,11 @@ router.post('/dub', (req, res) => {
         exportResolution,
         exportQuality,
         onProgress: ({ percent, message }) => {
-          global.dubProgress[exportId] = { status: 'processing', percent, message };
-        }
+          if (!cancelToken.cancelled) {
+            global.dubProgress[exportId] = { status: 'processing', percent, message };
+          }
+        },
+        cancelToken
       });
 
       global.dubProgress[exportId] = {
@@ -521,12 +527,40 @@ router.post('/dub', (req, res) => {
       };
       console.log(`[api/dub] Export ${exportId} completed successfully.`);
     } catch (error) {
-      console.error(`[api/dub] Export ${exportId} failed:`, error.message);
-      global.dubProgress[exportId] = { status: 'error', percent: 100, error: error.message };
+      if (cancelToken.cancelled || error.message === 'EXPORT_CANCELLED') {
+        console.log(`[api/dub] Export ${exportId} cancelled by user.`);
+        global.dubProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
+      } else {
+        console.error(`[api/dub] Export ${exportId} failed:`, error.message);
+        global.dubProgress[exportId] = { status: 'error', percent: 100, error: error.message };
+      }
+    } finally {
+      delete global.dubTasks[exportId];
     }
   })();
 
   res.json({ success: true, exportId });
+});
+
+// Cancel a running dubbing export
+router.post('/dub-cancel', (req, res) => {
+  const { exportId } = req.body;
+  if (!exportId) {
+    return res.status(400).json({ error: 'exportId is required' });
+  }
+
+  const task = global.dubTasks[exportId];
+  if (!task) {
+    return res.status(404).json({ error: 'Tác vụ xuất video không tồn tại hoặc đã kết thúc.' });
+  }
+
+  task.cancelled = true;
+  if (task.proc) {
+    try { task.proc.kill('SIGKILL'); } catch (e) { console.warn('[api/dub-cancel] Failed to kill ffmpeg:', e.message); }
+  }
+  global.dubProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
+  console.log(`[api/dub-cancel] Export ${exportId} cancellation requested.`);
+  res.json({ success: true });
 });
 
 // Poll dubbing export progress

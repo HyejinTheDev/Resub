@@ -392,7 +392,8 @@ async function exportDubbedVideo({
   capcutCookie,
   exportResolution = 'original',
   exportQuality = 'medium',
-  onProgress = () => {}
+  onProgress = () => {},
+  cancelToken = { cancelled: false, proc: null }
 }) {
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -411,6 +412,10 @@ async function exportDubbedVideo({
       const originalDuration = (endMs - startMs) / 1000;
 
       if (originalDuration <= 0) continue;
+
+      if (cancelToken.cancelled) {
+        throw new Error('EXPORT_CANCELLED');
+      }
 
       // TTS generation covers 0-60% of overall progress
       onProgress({
@@ -639,6 +644,9 @@ async function exportDubbedVideo({
     );
 
     // 5. Run FFmpeg
+    if (cancelToken.cancelled) {
+      throw new Error('EXPORT_CANCELLED');
+    }
     console.log(`[dubbingEngine] Running FFmpeg command with ${ttsFiles.length} TTS inputs...`);
     onProgress({ percent: 60, message: 'Đang ghép âm thanh & chèn phụ đề vào video (FFmpeg)...' });
 
@@ -648,6 +656,8 @@ async function exportDubbedVideo({
 
     await new Promise((resolve, reject) => {
       const proc = spawn(ffmpeg, ffmpegArgs, { cwd: tempDir });
+      // Expose the process so a cancel request can kill it mid-encode
+      cancelToken.proc = proc;
       let stderr = '';
       
       proc.stderr.on('data', (d) => {
@@ -665,7 +675,9 @@ async function exportDubbedVideo({
         }
       });
       proc.on('close', (code) => {
-        if (code === 0) resolve();
+        cancelToken.proc = null;
+        if (cancelToken.cancelled) reject(new Error('EXPORT_CANCELLED'));
+        else if (code === 0) resolve();
         else reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 800)}`));
       });
     });

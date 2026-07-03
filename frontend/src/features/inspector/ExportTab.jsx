@@ -26,6 +26,7 @@ export default function ExportTab() {
   const [exportResolution, setExportResolution] = useState('original');
   const [exportQuality, setExportQuality] = useState('medium');
   const [exportProgress, setExportProgress] = useState(null);
+  const [currentExportId, setCurrentExportId] = useState(null);
 
   const getCropDimensions = () => {
     if (cropStyle.aspectRatio === 'original') {
@@ -113,8 +114,9 @@ export default function ExportTab() {
       }
 
       const { exportId } = await response.json();
+      setCurrentExportId(exportId);
 
-      // Poll export progress until done/error (export runs in background on server)
+      // Poll export progress until done/error/cancelled (export runs in background on server)
       const finalStatus = await new Promise((resolve, reject) => {
         const poll = async () => {
           try {
@@ -127,6 +129,8 @@ export default function ExportTab() {
             const status = await statusRes.json();
             if (status.status === 'done') {
               resolve(status);
+            } else if (status.status === 'cancelled') {
+              reject(new Error('EXPORT_CANCELLED'));
             } else if (status.status === 'error') {
               reject(new Error(status.error || 'Xuất video thất bại trên máy chủ'));
             } else {
@@ -145,9 +149,28 @@ export default function ExportTab() {
       showToast('Xuất video lồng tiếng thành công! Bạn có thể tải video về.');
     } catch (error) {
       setExportProgress(null);
-      showToast(`Lỗi xuất video: ${error.message}`);
+      if (error.message === 'EXPORT_CANCELLED') {
+        showToast('Đã hủy xuất video.');
+      } else {
+        showToast(`Lỗi xuất video: ${error.message}`);
+      }
     } finally {
       setIsExporting(false);
+      setCurrentExportId(null);
+    }
+  };
+
+  const handleCancelExport = async () => {
+    if (!currentExportId) return;
+    try {
+      await fetch(`${API_BASE_URL}/dub-cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exportId: currentExportId })
+      });
+      // The polling loop will pick up the 'cancelled' status and reset the UI
+    } catch (error) {
+      showToast(`Không hủy được: ${error.message}`);
     }
   };
 
@@ -228,6 +251,13 @@ export default function ExportTab() {
               <p style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 {exportProgress.percent || 0}% — {exportProgress.message || 'Đang xử lý...'}
               </p>
+              <button
+                className="cancel-export-btn"
+                onClick={handleCancelExport}
+                style={{ display: 'block', width: '100%', marginTop: '10px', padding: '10px', background: 'transparent', color: '#f87171', fontWeight: 600, border: '1px solid #f87171', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                Hủy xuất video
+              </button>
             </div>
           )}
         </>
