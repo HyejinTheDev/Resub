@@ -25,6 +25,7 @@ export default function ExportTab() {
 
   const [exportResolution, setExportResolution] = useState('720p');
   const [exportQuality, setExportQuality] = useState('low');
+  const [burnSubtitles, setBurnSubtitles] = useState(false);
   const [exportProgress, setExportProgress] = useState(null);
   const [currentExportId, setCurrentExportId] = useState(null);
 
@@ -105,7 +106,8 @@ export default function ExportTab() {
           },
           videoTransform,
           exportResolution,
-          exportQuality
+          exportQuality,
+          burnSubtitles
         })
       });
 
@@ -244,6 +246,20 @@ export default function ExportTab() {
               <option value="medium">Trung bình (Cân bằng)</option>
               <option value="low">Thấp (Xuất nhanh nhất — khuyên dùng)</option>
             </select>
+          </div>
+
+          {/* Chèn phụ đề cứng */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+            <input 
+              type="checkbox"
+              id="burnSubtitles"
+              checked={burnSubtitles}
+              onChange={(e) => setBurnSubtitles(e.target.checked)}
+              style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--accent)' }}
+            />
+            <label htmlFor="burnSubtitles" style={{ fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              Chèn cứng phụ đề vào video (Xuất chậm hơn)
+            </label>
           </div>
         </div>
       )}

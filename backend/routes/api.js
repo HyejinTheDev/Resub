@@ -455,7 +455,7 @@ global.dubProgress = global.dubProgress || {};
 global.dubTasks = global.dubTasks || {};
 
 router.post('/dub', (req, res) => {
-  const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality } = req.body;
+  const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality, burnSubtitles } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
@@ -515,6 +515,7 @@ router.post('/dub', (req, res) => {
         videoTransform,
         exportResolution,
         exportQuality,
+        burnSubtitles: burnSubtitles !== undefined ? burnSubtitles : true,
         onProgress: ({ percent, message }) => {
           if (!cancelToken.cancelled) {
             global.dubProgress[exportId] = { status: 'processing', percent, message };

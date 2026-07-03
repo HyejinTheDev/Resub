@@ -2,116 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
-/**
- * Upload a file to Google Gemini Files API using resumable protocol
- */
-async function uploadFileToGemini(filePath, mimeType, apiKey) {
-  const fileStats = fs.statSync(filePath);
-  const fileSize = fileStats.size;
-
-  try {
-    // Step 1: Start resumable upload
-    const startResponse = await axios.post(
-      'https://generativelanguage.googleapis.com/upload/v1beta/files',
-      {
-        file: {
-          display_name: path.basename(filePath)
-        }
-      },
-      {
-        headers: {
-          'x-goog-api-key': apiKey,
-          'X-Goog-Upload-Protocol': 'resumable',
-          'X-Goog-Upload-Command': 'start',
-          'X-Goog-Upload-Header-Content-Length': fileSize.toString(),
-          'X-Goog-Upload-Header-Content-Type': mimeType,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const uploadUrl = startResponse.headers['x-goog-upload-url'];
-    if (!uploadUrl) {
-      throw new Error('Failed to get upload URL from Gemini Files API response.');
-    }
-
-    // Step 2: Upload file bytes
-    const fileStream = fs.createReadStream(filePath);
-    const uploadResponse = await axios.post(uploadUrl, fileStream, {
-      headers: {
-        'Content-Length': fileSize,
-        'X-Goog-Upload-Offset': '0',
-        'X-Goog-Upload-Command': 'upload, finalize',
-        'Content-Type': mimeType
-      },
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
-
-    const fileInfo = uploadResponse.data.file;
-    return fileInfo;
-  } catch (error) {
-    console.error('Error in uploadFileToGemini:', error.response?.data || error.message);
-    throw error;
-  }
-}
-
-/**
- * Wait for uploaded file to change state to ACTIVE
- */
-async function waitForFileProcessing(fileName, apiKey, maxWaitMs = 180000) {
-  const startTime = Date.now();
-  const pollInterval = 3000;
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const response = await axios.get(
-        `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
-        {
-          headers: {
-            'x-goog-api-key': apiKey
-          }
-        }
-      );
-
-      const fileState = response.data.state;
-      console.log(`[geminiService] File state: ${fileState}`);
-
-      if (fileState === 'ACTIVE') {
-        return response.data;
-      } else if (fileState === 'FAILED') {
-        throw new Error('File processing failed on Google servers.');
-      }
-
-      await new Promise((r) => setTimeout(r, pollInterval));
-    } catch (error) {
-      console.error('Error polling file status:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
-  throw new Error('Timeout waiting for file to process.');
-}
-
-/**
- * Delete file from Google servers to clean up
- */
-async function deleteGeminiFile(fileName, apiKey) {
-  try {
-    await axios.delete(
-      `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
-      {
-        headers: {
-          'x-goog-api-key': apiKey
-        }
-      }
-    );
-    console.log(`[geminiService] Deleted remote file ${fileName}`);
-  } catch (err) {
-    console.warn(`[geminiService] Failed to clean up file ${fileName}:`, err.message);
-  }
-}
-
 // Structured schema forces Gemini to return well-formed timestamped items and
 // prevents malformed / drifting output on longer inputs.
 const SUBTITLE_SCHEMA = {
@@ -139,11 +29,9 @@ const TRANSCRIBE_MODELS = [
 ];
 
 /**
- * Call Gemini model to transcribe and translate an audio file (or a short segment of one).
- * When the audio is a short segment cut from a longer file, timings are produced relative
- * to the start of the segment (00m00s000ms); the caller adds the absolute offset afterwards.
+ * Call Gemini model to transcribe and translate an audio file (or a short segment of one) using base64 inline data.
  */
-async function transcribeAndTranslate(fileUri, apiKey, options = {}) {
+async function transcribeAndTranslate(audioPath, apiKey, options = {}) {
   const { isSegment = false, segmentDurationSec = null } = options;
 
   const segmentNote = isSegment
@@ -165,17 +53,27 @@ Your response MUST be a JSON array only. Follow this exact JSON structure:
   }
 ]
 
+IMPORTANT RULES:
 - CRITICAL: Split subtitle segments into short, readable phrases. The Vietnamese translation ("text") MUST have its word count strictly matching the segment's duration to ensure perfect lip-sync. For a segment of D seconds (duration = endTime - startTime), the Vietnamese translation MUST contain between Math.floor(D * 2.8) and Math.ceil(D * 3.5) words. For example: a 2-second segment MUST have 6 to 7 words; a 1-second segment MUST have 3 to 4 words. Do not let the translation exceed this length.
 - If a speaker says a long sentence, you MUST split it into multiple consecutive smaller segments with precise start and end times matching the word timings.
 - Timestamps must be in chronological order and must never exceed the length of this audio.
 - Translate idioms and cultural references into natural Vietnamese phrasing.
 - Return ONLY the raw JSON array. DO NOT wrap it in markdown code blocks like \`\`\`json. DO NOT add any explanations or notes.${segmentNote}`;
 
+  let base64Audio;
+  try {
+    const audioBuffer = fs.readFileSync(audioPath);
+    base64Audio = audioBuffer.toString('base64');
+  } catch (err) {
+    console.error(`[geminiService] Failed to read audio file: ${audioPath}`, err.message);
+    throw err;
+  }
+
   let lastError = new Error('No models succeeded');
 
   for (const model of TRANSCRIBE_MODELS) {
     try {
-      console.log(`[geminiService] Attempting transcription${isSegment ? ' (segment)' : ''} using model: ${model}...`);
+      console.log(`[geminiService] Attempting transcription${isSegment ? ' (segment)' : ''} using model: ${model} (inline data)...`);
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
@@ -183,9 +81,9 @@ Your response MUST be a JSON array only. Follow this exact JSON structure:
             {
               parts: [
                 {
-                  file_data: {
-                    mime_type: 'audio/mp3',
-                    file_uri: fileUri
+                  inlineData: {
+                    mimeType: 'audio/mp3',
+                    data: base64Audio
                   }
                 },
                 {
@@ -222,8 +120,5 @@ Your response MUST be a JSON array only. Follow this exact JSON structure:
 }
 
 module.exports = {
-  uploadFileToGemini,
-  waitForFileProcessing,
-  deleteGeminiFile,
   transcribeAndTranslate
 };

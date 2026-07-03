@@ -5,12 +5,7 @@ const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 
 const { getFfmpegCommand, getFfprobeCommand } = require('./dubbingEngine');
-const {
-  uploadFileToGemini,
-  waitForFileProcessing,
-  deleteGeminiFile,
-  transcribeAndTranslate
-} = require('./geminiService');
+const { transcribeAndTranslate } = require('./geminiService');
 
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
 // A small overlap avoids losing phrases that straddle a cut; duplicates are removed on merge.
@@ -105,15 +100,11 @@ async function processSegment(segment, keyState, reportBadKey, acquireKey) {
 
   while (attempts < maxAttempts) {
     const currentKey = keyState.key;
-    let fileInfo = null;
     try {
-      fileInfo = await uploadFileToGemini(segment.path, 'audio/mp3', currentKey);
-      await waitForFileProcessing(fileInfo.name, currentKey);
-      const raw = await transcribeAndTranslate(fileInfo.uri, currentKey, {
+      const raw = await transcribeAndTranslate(segment.path, currentKey, {
         isSegment: true,
         segmentDurationSec: segment.lengthSec
       });
-      deleteGeminiFile(fileInfo.name, currentKey).catch(() => {});
 
       const offsetMs = segment.startSec * 1000;
       const segmentEndMs = (segment.startSec + segment.lengthSec) * 1000;
@@ -126,7 +117,6 @@ async function processSegment(segment, keyState, reportBadKey, acquireKey) {
         // Drop invalid or empty items and anything that spills far past the segment
         .filter((s) => s.endMs > s.startMs && (s.text.trim() || s.chineseText.trim()) && s.startMs < segmentEndMs + 1500);
     } catch (error) {
-      if (fileInfo) deleteGeminiFile(fileInfo.name, currentKey).catch(() => {});
       lastError = error;
       attempts++;
       console.warn(`[transcriptionEngine] Segment ${segment.index} attempt ${attempts} failed: ${error.message}`);

@@ -629,6 +629,7 @@ async function exportDubbedVideo({
   capcutCookie,
   exportResolution = 'original',
   exportQuality = 'medium',
+  burnSubtitles = true,
   onProgress = () => {},
   cancelToken = { cancelled: false, proc: null }
 }) {
@@ -859,43 +860,61 @@ async function exportDubbedVideo({
       currentVInput = cropLabel;
     }
 
-    // Burn-in subtitles on the final cropped stream (ass filter runs with cwd=tempDir)
-    filterGraph += `;[${currentVInput}]ass=subtitles.ass[vout]`;
-    // Filter segments are appended with a leading ';' — strip it for a valid graph
-    filterGraph = filterGraph.replace(/^;/, '');
+    const canCopyVideo = !burnSubtitles &&
+      activeMasks.length === 0 &&
+      !hasTransform &&
+      (!cropStyle || cropStyle.aspectRatio === 'original') &&
+      (!exportResolution || exportResolution === 'original');
 
-    // 5. Pass B: encode video with just 2 inputs (video + pre-mixed audio)
-    const qualityCrfMap = {
-      'high': '20',
-      'medium': '23',
-      'low': '28'
-    };
-    const presetMap = {
-      'high': 'veryfast',
-      'medium': 'superfast',
-      'low': 'ultrafast'
-    };
-    const crfValue = qualityCrfMap[exportQuality] || '23';
-    const presetValue = presetMap[exportQuality] || 'superfast';
+    let ffmpegArgs;
+    if (canCopyVideo) {
+      console.log('[dubbingEngine] Subtitles and video filters are disabled. Using stream copy (-c:v copy) for instant export!');
+      ffmpegArgs = [
+        '-y',
+        '-i', videoPath,
+        '-i', mixedAudioPath,
+        '-map', '0:v:0',
+        '-map', '1:a:0',
+        '-c:v', 'copy',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-ar', '44100',
+        '-ac', '2',
+        '-movflags', '+faststart',
+        outputPath
+      ];
+    } else {
+      // Burn-in subtitles on the final cropped stream (ass filter runs with cwd=tempDir)
+      if (burnSubtitles) {
+        filterGraph += `;[${currentVInput}]ass=subtitles.ass[vout]`;
+      } else {
+        filterGraph += `;[${currentVInput}]null[vout]`;
+      }
+      // Filter segments are appended with a leading ';' — strip it for a valid graph
+      filterGraph = filterGraph.replace(/^;/, '');
 
-    const ffmpegArgs = [
-      '-y',
-      '-i', videoPath,
-      '-i', mixedAudioPath,
-      '-filter_complex', filterGraph,
-      '-map', '[vout]',
-      '-map', '1:a:0',
-      '-c:v', 'libx264',
-      '-crf', crfValue,
-      '-preset', presetValue,
-      '-threads', '0',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-ar', '44100',
-      '-ac', '2',
-      '-movflags', '+faststart',
-      outputPath
-    ];
+      const crfValue = qualityCrfMap[exportQuality] || '23';
+      const presetValue = presetMap[exportQuality] || 'superfast';
+
+      ffmpegArgs = [
+        '-y',
+        '-i', videoPath,
+        '-i', mixedAudioPath,
+        '-filter_complex', filterGraph,
+        '-map', '[vout]',
+        '-map', '1:a:0',
+        '-c:v', 'libx264',
+        '-crf', crfValue,
+        '-preset', presetValue,
+        '-threads', '0',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-ar', '44100',
+        '-ac', '2',
+        '-movflags', '+faststart',
+        outputPath
+      ];
+    }
 
     if (cancelToken.cancelled) {
       throw new Error('EXPORT_CANCELLED');
