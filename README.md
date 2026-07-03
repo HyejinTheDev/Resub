@@ -1,3 +1,12 @@
+---
+title: Resub Backend
+emoji: 📉
+colorFrom: gray
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # RESUB - CapCut style Auto Dubbing Tool
 
 RESUB is a powerful web-based application designed for automated Chinese to Vietnamese video transcription, translation, voice dubbing, and editing. It features a professional multi-track timeline, visual editing overlays (drag and resize for subtitles and blur masks), and real-time audio generation.
