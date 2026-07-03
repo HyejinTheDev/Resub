@@ -476,10 +476,12 @@ async function exportDubbedVideo({
     }
 
     // 4. Video filter graph for blur mask and subtitles
-    let forceStyle = "FontName=Arial,Alignment=2";
+    let forceStyle = "FontName=Arial,Alignment=2,WrapStyle=0";
     if (subtitleStyle) {
       const fs = subtitleStyle.fontSize || 17;
-      const assFontSize = Math.round(fs * 1.8);
+      // Scale font relative to video height (baseline: 720p)
+      const scaleFactor = targetHeight / 720;
+      const assFontSize = Math.round(fs * scaleFactor);
       forceStyle += `,FontSize=${assFontSize}`;
       
       const textColor = subtitleStyle.color || '#ffffff';
@@ -495,18 +497,16 @@ async function exportDubbedVideo({
       }
       
       const y = subtitleStyle.yPercent !== undefined ? subtitleStyle.yPercent : 85;
-      // yPercent is the CENTER of the subtitle text (CSS translate(-50%, -50%))
-      // ASS Alignment=2 means bottom-center, MarginV = distance from bottom edge of video to bottom of text
-      // So MarginV = totalHeight - bottomOfText = totalHeight - (centerY + halfTextHeight)
-      // Approximate: MarginV = totalHeight * (1 - y/100) - assFontSize/2
-      const marginV = Math.max(0, Math.round(targetHeight * (1 - y / 100) - assFontSize / 2));
+      // MarginV = distance from bottom of video to the subtitle baseline
+      // yPercent is measured from top (CSS style), so distance from bottom = (100 - y)%
+      const marginV = Math.max(10, Math.round(targetHeight * (100 - y) / 100));
       forceStyle += `,MarginV=${marginV}`;
 
       const wPercent = subtitleStyle.widthPercent !== undefined ? subtitleStyle.widthPercent : 80;
       const marginH = Math.round(((100 - wPercent) / 2) / 100 * targetWidth);
       forceStyle += `,MarginL=${marginH},MarginR=${marginH}`;
     } else {
-      forceStyle += `,FontSize=30,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,MarginV=30`;
+      forceStyle += `,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,MarginV=30`;
     }
 
     // Process blur segments on original video size
