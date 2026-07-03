@@ -188,7 +188,8 @@ export default function VideoImportScreen() {
         const subs = await handleTranscribe(data.audioPath);
         
         if (subs) {
-          setSubtitles(subs);
+          // Stamp every segment with the chosen default voice so UI and export stay in sync
+          setSubtitles(subs.map(s => ({ ...s, voice: s.voice || defaultVoice })));
           setVideoData(data);
           showToast(`Hoàn tất! Đã tạo ${subs.length} phân đoạn thuyết minh.`);
         }
@@ -225,7 +226,7 @@ export default function VideoImportScreen() {
       const subs = await handleTranscribe(data.audioPath);
       
       if (subs) {
-        setSubtitles(subs);
+        setSubtitles(subs.map(s => ({ ...s, voice: s.voice || defaultVoice })));
         setVideoData(data);
         showToast(`Hoàn tất! Đã tải phân đoạn và tạo ${subs.length} phân đoạn thuyết minh.`);
       }

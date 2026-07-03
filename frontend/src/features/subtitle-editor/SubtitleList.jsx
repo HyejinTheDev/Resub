@@ -64,7 +64,7 @@ export default function SubtitleList({ onSeek }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: sub.text,
-          voice: sub.voice,
+          voice: sub.voice || defaultVoice,
           capcutCookie
         })
       });
@@ -214,7 +214,7 @@ export default function SubtitleList({ onSeek }) {
                   <span style={{color: 'var(--text-muted)'}}>Giọng:</span>
                   <select 
                     className="voice-dropdown"
-                    value={sub.voice}
+                    value={sub.voice || defaultVoice}
                     onChange={(e) => handleSubtitleVoiceChange(i, e.target.value)}
                   >
                     {VOICES.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}

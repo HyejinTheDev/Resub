@@ -21,7 +21,7 @@ export default function ExportTab() {
   } = useProjectStore();
 
   const { capcutCookie } = useSettingsStore();
-  const { bgVolume, ttsVolume, videoDimensions } = usePlaybackStore();
+  const { bgVolume, ttsVolume, videoDimensions, defaultVoice } = usePlaybackStore();
 
   const [exportResolution, setExportResolution] = useState('original');
   const [exportQuality, setExportQuality] = useState('medium');
@@ -90,6 +90,7 @@ export default function ExportTab() {
         body: JSON.stringify({
           videoPath: videoData.videoPath,
           subtitles,
+          voice: defaultVoice,
           bgVolume,
           ttsVolume,
           blurMasks,
