@@ -302,9 +302,10 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   const videoPath = req.file.path;
   const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
   const ffprobe = getFfprobeCommand();
+  const safeFfprobe = ffprobe.includes(' ') ? `"${ffprobe}"` : ffprobe;
 
   try {
-    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const durationCmd = `${safeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
     if (duration > 300) {
@@ -469,7 +470,8 @@ router.post('/dub', (req, res) => {
 
   try {
     const ffprobe = getFfprobeCommand();
-    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const safeFfprobe = ffprobe.includes(' ') ? `"${ffprobe}"` : ffprobe;
+    const durationCmd = `${safeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
     if (duration > 300) {
@@ -656,10 +658,12 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
 
   const ffmpeg = getFfmpegCommand();
   const ffprobe = getFfprobeCommand();
+  const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+  const safeFfprobe = ffprobe.includes(' ') ? `"${ffprobe}"` : ffprobe;
 
   try {
     // 1. Get original video duration using ffprobe
-    const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    const durationCmd = `${safeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const originalDuration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
     // 2. Perform splitting
@@ -668,7 +672,7 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
     // Command: ffmpeg -i input -f segment -segment_time S -reset_timestamps 1 -c copy -map 0 output_%03d.mp4
     // We execute this synchronously
     const { execSync: cpExecSync } = require('child_process');
-    const splitCmd = `"${ffmpeg}" -y -i "${videoPath}" -f segment -segment_time ${segmentSeconds} -reset_timestamps 1 -c copy -map 0 "${outputPattern}"`;
+    const splitCmd = `${safeFfmpeg} -y -i "${videoPath}" -f segment -segment_time ${segmentSeconds} -reset_timestamps 1 -c copy -map 0 "${outputPattern}"`;
     cpExecSync(splitCmd);
 
     // 3. Read output files
