@@ -76,10 +76,8 @@ export default function VideoImportScreen() {
   const handleSplitFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      validateVideoDuration(file, () => {
-        setSplitFile(file);
-        setSplitSegments([]);
-      });
+      setSplitFile(file);
+      setSplitSegments([]);
       e.target.value = null;
     }
   };
