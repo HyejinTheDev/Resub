@@ -10,7 +10,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '874744439002-c4q4lhmlh
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { downloadVideo } = require('../services/downloader');
-const { uploadFileToGemini, waitForFileProcessing, deleteGeminiFile, transcribeAndTranslate } = require('../services/geminiService');
+const { transcribeSegmented } = require('../services/transcriptionEngine');
 const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
 
 const router = express.Router();
@@ -302,9 +302,9 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
-    if (duration > 600) {
+    if (duration > 300) {
       fs.unlinkSync(videoPath);
-      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
+      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
     }
 
     await extractAudio(videoPath, audioPath);
@@ -347,93 +347,50 @@ router.post('/transcribe', async (req, res) => {
     message: 'Khởi tạo tác vụ nhận dạng & dịch thuật...' 
   };
 
-  // Start background process
+  // Start background process — segmented transcription for tight timing accuracy
   (async () => {
-    let currentKey = geminiKey;
-    let attempts = 0;
-    const maxAttempts = 3;
+    // acquireKey borrows/rotates a key: from the KeyManager pool, or the user-supplied fixed key
+    const acquireKey = async () => {
+      if (!useSystemPool) return geminiKey;
+      return fetchKeyFromManager();
+    };
+    const reportBadKey = async (key, type) => {
+      if (!useSystemPool) return;
+      const isInvalid = type === 'invalid';
+      console.warn(`[api/transcribe] Reporting bad key: ${key.substring(0, 8)}... (isInvalid: ${isInvalid})`);
+      await reportBadKeyToManager(key, type);
+    };
 
-    while (attempts < maxAttempts) {
+    try {
       if (useSystemPool) {
-        try {
-          global.transcribeProgress[taskId] = { 
-            status: 'uploading', 
-            percent: 10, 
-            message: 'Đang mượn API Key từ KeyManager...' 
-          };
-          currentKey = await fetchKeyFromManager();
-        } catch (keyErr) {
-          console.error('[api/transcribe] Failed to fetch key from KeyManager:', keyErr.message);
-          global.transcribeProgress[taskId] = { 
-            status: 'error', 
-            percent: 100, 
-            error: `Bể chứa Key báo lỗi: ${keyErr.message}` 
-          };
-          return;
-        }
+        global.transcribeProgress[taskId] = {
+          status: 'uploading',
+          percent: 6,
+          message: 'Đang mượn API Key từ KeyManager...'
+        };
       }
 
-      try {
-        // Step 1: Upload to Gemini Files API
-        global.transcribeProgress[taskId] = { 
-          status: 'uploading', 
-          percent: 20, 
-          message: 'Gửi âm thanh lên máy chủ Google AI...' 
-        };
-        const fileInfo = await uploadFileToGemini(audioPath, 'audio/mp3', currentKey);
-        console.log(`[api/transcribe] Uploaded to Google: ${fileInfo.name}`);
-
-        // Step 2: Wait for file processing
-        global.transcribeProgress[taskId] = { 
-          status: 'processing', 
-          percent: 50, 
-          message: 'Google AI đang phân tích tệp âm thanh...' 
-        };
-        await waitForFileProcessing(fileInfo.name, currentKey);
-
-        // Step 3: Call model
-        global.transcribeProgress[taskId] = { 
-          status: 'transcribing', 
-          percent: 80, 
-          message: 'Gemini AI đang nhận dạng tiếng Trung & biên dịch phụ đề...' 
-        };
-        const subtitles = await transcribeAndTranslate(fileInfo.uri, currentKey);
-        console.log(`[api/transcribe] Task ${taskId} successfully generated ${subtitles.length} segments`);
-
-        // Clean up remote file
-        deleteGeminiFile(fileInfo.name, currentKey).catch(() => {});
-
-        // Final progress update
-        global.transcribeProgress[taskId] = { 
-          status: 'done', 
-          percent: 100, 
-          subtitles 
-        };
-        return; // Success, exit loop
-      } catch (error) {
-        console.error(`[api/transcribe] Attempt ${attempts + 1} failed:`, error.message);
-        
-        if (useSystemPool) {
-          // Identify key hỏng / key rate limit
-          const isInvalid = error.message.includes('403') || error.message.includes('API key not valid');
-          console.warn(`[api/transcribe] Reporting bad key: ${currentKey.substring(0, 8)}... (isInvalid: ${isInvalid})`);
-          await reportBadKeyToManager(currentKey, isInvalid ? 'invalid' : 'rate');
-          
-          attempts++;
-          if (attempts < maxAttempts) {
-            console.log(`[api/transcribe] Retrying transcription attempt ${attempts + 1}/${maxAttempts}...`);
-            continue;
-          }
+      const subtitles = await transcribeSegmented(audioPath, {
+        acquireKey,
+        reportBadKey,
+        onProgress: ({ percent, message }) => {
+          global.transcribeProgress[taskId] = { status: 'transcribing', percent, message };
         }
-        
-        // Final failure if no retries left or not using pool
-        global.transcribeProgress[taskId] = { 
-          status: 'error', 
-          percent: 100, 
-          error: error.message 
-        };
-        return;
-      }
+      });
+
+      console.log(`[api/transcribe] Task ${taskId} generated ${subtitles.length} merged segments`);
+      global.transcribeProgress[taskId] = {
+        status: 'done',
+        percent: 100,
+        subtitles
+      };
+    } catch (error) {
+      console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
+      global.transcribeProgress[taskId] = {
+        status: 'error',
+        percent: 100,
+        error: error.message
+      };
     }
   })();
 
@@ -483,8 +440,8 @@ router.post('/dub', (req, res) => {
     const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
-    if (duration > 600) {
-      return res.status(400).json({ error: 'Video xuất quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
+    if (duration > 300) {
+      return res.status(400).json({ error: 'Video xuất quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
     }
   } catch (error) {
     return res.status(500).json({ error: `Không đọc được thông tin video: ${error.message}` });

@@ -112,14 +112,48 @@ async function deleteGeminiFile(fileName, apiKey) {
   }
 }
 
+// Structured schema forces Gemini to return well-formed timestamped items and
+// prevents malformed / drifting output on longer inputs.
+const SUBTITLE_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      startTime: { type: 'string', description: 'Start time in format MMmSSsNNNms (e.g. "00m00s500ms")' },
+      endTime: { type: 'string', description: 'End time in format MMmSSsNNNms (e.g. "00m03s500ms")' },
+      chineseText: { type: 'string', description: 'Original Chinese transcription' },
+      text: { type: 'string', description: 'Natural Vietnamese translation' }
+    },
+    required: ['startTime', 'endTime', 'chineseText', 'text'],
+    propertyOrdering: ['startTime', 'endTime', 'chineseText', 'text']
+  }
+};
+
+// Prefer Gemini 2.5 first: it respects short-segment timing far better than 2.0.
+const TRANSCRIBE_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-1.5-flash'
+];
+
 /**
- * Call Gemini model to transcribe and translate audio file
+ * Call Gemini model to transcribe and translate an audio file (or a short segment of one).
+ * When the audio is a short segment cut from a longer file, timings are produced relative
+ * to the start of the segment (00m00s000ms); the caller adds the absolute offset afterwards.
  */
-async function transcribeAndTranslate(fileUri, apiKey) {
+async function transcribeAndTranslate(fileUri, apiKey, options = {}) {
+  const { isSegment = false, segmentDurationSec = null } = options;
+
+  const segmentNote = isSegment
+    ? `\n\nSEGMENT TIMING: This audio is a short segment cut from a longer video${segmentDurationSec ? ` (about ${segmentDurationSec.toFixed(1)} seconds long)` : ''}. Measure every start and end time RELATIVE TO THE BEGINNING OF THIS SEGMENT, i.e. the segment starts at 00m00s000ms. Do NOT try to guess the position within the original full video.`
+    : '';
+
   const prompt = `Transcribe all spoken content in this audio. For each segment of speech:
-1. Detect the exact start and end times in the format "00m00s000ms" (timing of speech)
-2. Transcribe the original Chinese text exactly
-3. Translate it directly into natural, context-appropriate Vietnamese
+1. Detect the exact start and end times in the format "00m00s000ms" (timing of speech). Be precise: the times MUST line up tightly with when each phrase is actually spoken.
+2. Transcribe the original Chinese text exactly.
+3. Translate it directly into natural, context-appropriate Vietnamese.
 
 Your response MUST be a JSON array only. Follow this exact JSON structure:
 [
@@ -134,22 +168,15 @@ Your response MUST be a JSON array only. Follow this exact JSON structure:
 IMPORTANT RULES:
 - CRITICAL: Split subtitle segments into short, readable phrases. Each segment's Vietnamese translation ("text") MUST be at most 8-10 words (or under 3 seconds in duration) so that it fits cleanly on a single line.
 - If a speaker says a long sentence, you MUST split it into multiple consecutive smaller segments with precise start and end times matching the word timings.
+- Timestamps must be in chronological order and must never exceed the length of this audio.
 - Translate idioms and cultural references into natural Vietnamese phrasing.
-- Return ONLY the raw JSON array. DO NOT wrap it in markdown code blocks like \`\`\`json. DO NOT add any explanations or notes.`;
-
-  const models = [
-    'gemini-2.0-flash',
-    'gemini-2.5-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-1.5-flash'
-  ];
+- Return ONLY the raw JSON array. DO NOT wrap it in markdown code blocks like \`\`\`json. DO NOT add any explanations or notes.${segmentNote}`;
 
   let lastError = new Error('No models succeeded');
 
-  for (const model of models) {
+  for (const model of TRANSCRIBE_MODELS) {
     try {
-      console.log(`[geminiService] Attempting transcription and translation using model: ${model}...`);
+      console.log(`[geminiService] Attempting transcription${isSegment ? ' (segment)' : ''} using model: ${model}...`);
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
@@ -169,15 +196,20 @@ IMPORTANT RULES:
             }
           ],
           generationConfig: {
-            responseMimeType: 'application/json'
+            responseMimeType: 'application/json',
+            responseSchema: SUBTITLE_SCHEMA,
+            maxOutputTokens: 65536,
+            topK: 32,
+            topP: 0.95
           }
         }
       );
 
       const outputText = response.data.candidates[0].content.parts[0].text;
-      console.log(`[geminiService] Raw model response from ${model}:`, outputText);
-
       const parsedJson = JSON.parse(outputText.trim());
+      if (!Array.isArray(parsedJson)) {
+        throw new Error('Model did not return a JSON array');
+      }
       return parsedJson;
     } catch (error) {
       const status = error.response?.status || error.response?.data?.error?.code || 'unknown';

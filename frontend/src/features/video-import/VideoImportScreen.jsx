@@ -61,8 +61,8 @@ export default function VideoImportScreen() {
     video.onloadedmetadata = () => {
       window.URL.revokeObjectURL(video.src);
       const duration = video.duration;
-      if (duration > 600) {
-        showToast('Video quá dài! Thời lượng tối đa cho phép tải lên là 10 phút (600 giây).');
+      if (duration > 300) {
+        showToast('Video quá dài! Thời lượng tối đa cho phép tải lên là 5 phút (300 giây).');
       } else {
         onSuccess();
       }
