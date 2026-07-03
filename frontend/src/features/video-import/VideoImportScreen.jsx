@@ -130,13 +130,25 @@ export default function VideoImportScreen() {
       })
       .then(() => {
         // Start polling every 1.5 seconds
+        let notFoundCount = 0;
         const pollInterval = setInterval(() => {
           fetch(`${API_BASE_URL}/transcribe-status?taskId=${taskId}`)
             .then(res => {
+              if (res.status === 404) {
+                // Task vanished — server was likely redeployed/restarted mid-task
+                notFoundCount++;
+                if (notFoundCount >= 3) {
+                  clearInterval(pollInterval);
+                  reject(new Error('Máy chủ vừa khởi động lại nên tác vụ dịch bị mất. Vui lòng tải video lên và thử lại.'));
+                }
+                return null;
+              }
               if (!res.ok) throw new Error('Status query failed');
               return res.json();
             })
             .then(statusData => {
+              if (!statusData) return;
+              notFoundCount = 0;
               if (statusData.status === 'done') {
                 clearInterval(pollInterval);
                 setUploadProgress(100);

@@ -119,14 +119,26 @@ export default function ExportTab() {
 
       // Poll export progress until done/error/cancelled (export runs in background on server)
       const finalStatus = await new Promise((resolve, reject) => {
+        let notFoundCount = 0;
         const poll = async () => {
           try {
             const statusRes = await fetch(`${API_BASE_URL}/dub-status?exportId=${exportId}`);
+            if (statusRes.status === 404) {
+              // Task vanished — server was likely redeployed/restarted mid-export
+              notFoundCount++;
+              if (notFoundCount >= 3) {
+                reject(new Error('Máy chủ vừa khởi động lại nên tác vụ xuất video bị mất. Vui lòng thử xuất lại.'));
+                return;
+              }
+              setTimeout(poll, 5000);
+              return;
+            }
             if (!statusRes.ok) {
               // Transient errors (e.g. 502 while server is busy) — keep polling
               setTimeout(poll, 5000);
               return;
             }
+            notFoundCount = 0;
             const status = await statusRes.json();
             if (status.status === 'done') {
               resolve(status);
