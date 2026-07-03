@@ -1,4 +1,4 @@
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -82,11 +82,34 @@ function getFfprobeCommand() {
   return 'ffprobe';
 }
 
-function getVideoDimensions(videoPath) {
+/**
+ * Run a command asynchronously and capture stdout (non-blocking, keeps the event loop free)
+ */
+function runCommand(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args);
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(stderr.substring(0, 300) || `Command failed with code ${code}`));
+    });
+  });
+}
+
+async function getVideoDimensions(videoPath) {
   try {
     const ffprobe = getFfprobeCommand();
-    const cmd = `"${ffprobe}" -v error -select_streams v:0 -show_entries stream=width,height -of json "${videoPath}"`;
-    const output = execSync(cmd).toString();
+    const output = await runCommand(ffprobe, [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height',
+      '-of', 'json',
+      videoPath
+    ]);
     const data = JSON.parse(output);
     if (data.streams && data.streams[0]) {
       return {
@@ -263,16 +286,17 @@ async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcu
 }
 
 /**
- * Get Audio Duration in seconds using ffprobe
+ * Get Audio Duration in seconds using ffprobe (async, non-blocking)
  */
-function getAudioDuration(filePath) {
-  const ffprobeCmd = getFfmpegCommand().replace('ffmpeg', 'ffprobe');
+async function getAudioDuration(filePath) {
   try {
-    const stdout = execSync(
-      `"${ffprobeCmd}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-      { encoding: 'utf8' }
-    );
-    return parseFloat(stdout.trim());
+    const stdout = await runCommand(getFfprobeCommand(), [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath
+    ]);
+    return parseFloat(stdout.trim()) || 0;
   } catch (err) {
     console.error('Error getting audio duration:', err.message);
     return 0;
@@ -399,75 +423,106 @@ async function exportDubbedVideo({
   fs.mkdirSync(tempDir, { recursive: true });
 
   const ffmpeg = getFfmpegCommand();
-  const ttsFiles = [];
-  const filterInputs = [];
-  const ffmpegArgs = ['-y', '-i', videoPath];
 
   try {
-    // 1. Generate & Speed-adjust TTS for each subtitle segment
+    // 1. Generate & speed-adjust TTS for all segments in parallel batches.
+    // CapCut voices get a lower concurrency to avoid tripping their rate limit.
+    const ttsTasks = [];
     for (let i = 0; i < subtitles.length; i++) {
       const sub = subtitles[i];
       const startMs = parseTimeToMs(sub.startTime);
       const endMs = parseTimeToMs(sub.endTime);
       const originalDuration = (endMs - startMs) / 1000;
-
       if (originalDuration <= 0) continue;
-
-      if (cancelToken.cancelled) {
-        throw new Error('EXPORT_CANCELLED');
-      }
-
-      // TTS generation covers 0-60% of overall progress
-      onProgress({
-        percent: Math.round((i / subtitles.length) * 60),
-        message: `Đang tạo giọng đọc câu ${i + 1}/${subtitles.length}...`
-      });
-
-      const rawTtsPath = path.join(tempDir, `tts_${i}_raw.mp3`);
-      const speedTtsPath = path.join(tempDir, `tts_${i}_speed.mp3`);
-
-      // Generate base TTS
-      await generateTTS(sub.text, sub.voice || voice, rawTtsPath, capcutCookie);
-      const ttsDuration = getAudioDuration(rawTtsPath);
-
-      // Determine required speed-up
-      let speed = 1.0;
-      if (ttsDuration > originalDuration) {
-        speed = ttsDuration / originalDuration;
-      }
-
-      // Adjust speed to fit original interval
-      await adjustAudioSpeed(rawTtsPath, speedTtsPath, speed);
-
-      // Add to FFmpeg inputs
-      ffmpegArgs.push('-i', speedTtsPath);
-      ttsFiles.push({ index: i, startMs, path: speedTtsPath });
+      ttsTasks.push({ index: i, sub, startMs, originalDuration, path: null });
     }
 
-    // 2. Build the Audio Filter Graph for delays and mixing
-    // Video audio is input index 0. TTS files are indices 1 to N.
-    let filterGraph = '';
-    
-    // Scale original audio volume to bgVolume
-    filterGraph += `[0:a]volume=${bgVolume}[bg];`;
+    const usesCapcutVoice = ttsTasks.some(t => (t.sub.voice || voice).startsWith('capcut-'));
+    const concurrency = Math.max(1, Math.min(usesCapcutVoice ? 3 : 6, ttsTasks.length));
+    let completedCount = 0;
+    let nextTaskIdx = 0;
 
-    // Delay and scale volume of each TTS track
-    ttsFiles.forEach((file, index) => {
-      // index + 1 matches the input index in ffmpeg
-      const inputIndex = index + 1;
-      filterGraph += `[${inputIndex}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[tts_${index}];`;
-      filterInputs.push(`[tts_${index}]`);
+    const ttsWorker = async () => {
+      while (nextTaskIdx < ttsTasks.length) {
+        if (cancelToken.cancelled) {
+          throw new Error('EXPORT_CANCELLED');
+        }
+        const task = ttsTasks[nextTaskIdx++];
+        const rawTtsPath = path.join(tempDir, `tts_${task.index}_raw.mp3`);
+        const speedTtsPath = path.join(tempDir, `tts_${task.index}_speed.mp3`);
+
+        await generateTTS(task.sub.text, task.sub.voice || voice, rawTtsPath, capcutCookie);
+        const ttsDuration = await getAudioDuration(rawTtsPath);
+
+        // Speed up TTS when it overflows the original subtitle interval
+        let speed = 1.0;
+        if (ttsDuration > task.originalDuration) {
+          speed = ttsDuration / task.originalDuration;
+        }
+        await adjustAudioSpeed(rawTtsPath, speedTtsPath, speed);
+
+        task.path = speedTtsPath;
+        completedCount++;
+        // TTS generation covers 0-55% of overall progress
+        onProgress({
+          percent: Math.round((completedCount / ttsTasks.length) * 55),
+          message: `Đang tạo giọng đọc: ${completedCount}/${ttsTasks.length} câu...`
+        });
+      }
+    };
+
+    if (ttsTasks.length > 0) {
+      await Promise.all(Array.from({ length: concurrency }, () => ttsWorker()));
+    }
+
+    const ttsFiles = ttsTasks.filter(t => t.path).map(t => ({ index: t.index, startMs: t.startMs, path: t.path }));
+
+    // 2. Pass A: mix background audio + all delayed TTS tracks into ONE audio file.
+    // Audio-only processing is fast, and it keeps the heavy video pass down to 2 inputs.
+    if (cancelToken.cancelled) {
+      throw new Error('EXPORT_CANCELLED');
+    }
+    onProgress({ percent: 56, message: 'Đang trộn giọng đọc với nhạc nền...' });
+
+    const mixedAudioPath = path.join(tempDir, 'mixed_audio.m4a');
+    const audioArgs = ['-y', '-i', videoPath];
+    let audioGraph = `[0:a]volume=${bgVolume}[bg];`;
+    const mixInputs = [];
+    ttsFiles.forEach((file, idx) => {
+      audioArgs.push('-i', file.path);
+      audioGraph += `[${idx + 1}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[tts_${idx}];`;
+      mixInputs.push(`[tts_${idx}]`);
+    });
+    if (mixInputs.length > 0) {
+      audioGraph += `[bg]${mixInputs.join('')}amix=inputs=${1 + mixInputs.length}:duration=first[aout]`;
+    } else {
+      audioGraph = `[0:a]volume=${bgVolume}[aout]`;
+    }
+    audioArgs.push('-filter_complex', audioGraph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', mixedAudioPath);
+
+    await new Promise((resolve, reject) => {
+      const proc = spawn(ffmpeg, audioArgs, { cwd: tempDir });
+      cancelToken.proc = proc;
+      let stderr = '';
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('close', (code) => {
+        cancelToken.proc = null;
+        if (cancelToken.cancelled) reject(new Error('EXPORT_CANCELLED'));
+        else if (code === 0) resolve();
+        else reject(new Error(`FFmpeg audio mix failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 500)}`));
+      });
     });
 
-    // Mix background audio + all delayed TTS tracks
-    filterGraph += `[bg]${filterInputs.join('')}amix=inputs=${1 + ttsFiles.length}:duration=first[aout]`;
+    // Video filter graph (transform, blur, crop, scale, subtitles) is built below;
+    // segments are appended with a leading ';' and the first one is stripped before use.
+    let filterGraph = '';
 
     // 3. Subtitles SRT generation
     const srtPath = path.join(tempDir, 'subtitles.srt');
     generateSrtFile(subtitles, srtPath);
 
     // Get original video dimensions to calculate accurate margins and crop sizes
-    const originalDimensions = getVideoDimensions(videoPath);
+    const originalDimensions = await getVideoDimensions(videoPath);
     let targetWidth = originalDimensions.width;
     let targetHeight = originalDimensions.height;
 
@@ -567,7 +622,12 @@ async function exportDubbedVideo({
         const y = mask.yPercentage || 80;
         const w = mask.widthPercentage !== undefined ? mask.widthPercentage : 80;
         const h = mask.heightPercentage || 15;
-        const r = mask.blurRadius || 15;
+        // FFmpeg rejects boxblur radii above 1/4 of the smallest crop edge (chroma plane is half-size),
+        // so clamp the requested radius to what the mask area actually allows
+        const maskWpx = Math.max(2, Math.round(originalDimensions.width * w / 100));
+        const maskHpx = Math.max(2, Math.round(originalDimensions.height * h / 100));
+        const maxRadius = Math.max(1, Math.floor(Math.min(maskWpx, maskHpx) / 4) - 1);
+        const r = Math.min(mask.blurRadius || 15, maxRadius);
         const hexColor = mask.color || '#000000';
         const opacity = mask.opacity !== undefined ? mask.opacity : 0.45;
         const ffmpegColor = `0x${hexColor.slice(1)}`;
@@ -586,7 +646,7 @@ async function exportDubbedVideo({
                        `[${toBlurLabel}]boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${opacity}:t=fill[${blurredSrcLabel}];` +
                        `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.1:y=ih*0.1:w=iw*0.8:h=ih*0.8:color=white:t=fill,boxblur=luma_radius=${r}:luma_power=3[${alphaMaskLabel}];` +
                        `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
-                       `[${mainLabel}][${featheredLabel}]overlay=x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
+                       `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         
         currentVInput = nextVLabel;
         filterIndex++;
@@ -622,37 +682,41 @@ async function exportDubbedVideo({
 
     // Burn-in subtitles on the final cropped stream
     filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
+    // Filter segments are appended with a leading ';' — strip it for a valid graph
+    filterGraph = filterGraph.replace(/^;/, '');
 
-    // 5. Assemble final arguments
+    // 5. Pass B: encode video with just 2 inputs (video + pre-mixed audio)
     const qualityCrfMap = {
       'high': '18',
       'medium': '23',
       'low': '28'
     };
     const crfValue = qualityCrfMap[exportQuality] || '23';
+    // "low" quality favors speed with a faster preset; medium/high keep veryfast
+    const presetValue = exportQuality === 'low' ? 'superfast' : 'veryfast';
 
-    ffmpegArgs.push(
+    const ffmpegArgs = [
+      '-y',
+      '-i', videoPath,
+      '-i', mixedAudioPath,
       '-filter_complex', filterGraph,
       '-map', '[vout]',
-      '-map', '[aout]',
+      '-map', '1:a',
       '-c:v', 'libx264',
       '-crf', crfValue,
-      '-preset', 'veryfast',
-      '-c:a', 'aac',
+      '-preset', presetValue,
+      '-c:a', 'copy',
       '-shortest',
       outputPath
-    );
+    ];
 
-    // 5. Run FFmpeg
     if (cancelToken.cancelled) {
       throw new Error('EXPORT_CANCELLED');
     }
-    console.log(`[dubbingEngine] Running FFmpeg command with ${ttsFiles.length} TTS inputs...`);
-    onProgress({ percent: 60, message: 'Đang ghép âm thanh & chèn phụ đề vào video (FFmpeg)...' });
+    console.log(`[dubbingEngine] Running FFmpeg video pass (${ttsFiles.length} TTS tracks pre-mixed)...`);
+    onProgress({ percent: 60, message: 'Đang chèn phụ đề & xử lý hình ảnh (FFmpeg)...' });
 
-    const videoDurationSec = (() => {
-      try { return getAudioDuration(videoPath) || 0; } catch { return 0; }
-    })();
+    const videoDurationSec = await getAudioDuration(videoPath);
 
     await new Promise((resolve, reject) => {
       const proc = spawn(ffmpeg, ffmpegArgs, { cwd: tempDir });
@@ -678,7 +742,10 @@ async function exportDubbedVideo({
         cancelToken.proc = null;
         if (cancelToken.cancelled) reject(new Error('EXPORT_CANCELLED'));
         else if (code === 0) resolve();
-        else reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 800)}`));
+        else {
+          console.error('[dubbingEngine] Video pass failed. Filter graph:', filterGraph);
+          reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 2500)}`));
+        }
       });
     });
 
