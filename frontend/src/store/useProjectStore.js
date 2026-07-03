@@ -84,7 +84,6 @@ export const useProjectStore = create((set) => ({
 
   showToast: (msg) => {
     set({ toastMessage: msg });
-    setTimeout(() => set({ toastMessage: '' }), 4000);
   },
 
   saveHistory: () => set((state) => {

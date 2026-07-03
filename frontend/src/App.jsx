@@ -532,10 +532,16 @@ export default function App() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Popup Notification */}
       {toastMessage && (
-        <div className="toast">
-          {toastMessage}
+        <div className="popup-overlay" onClick={() => useProjectStore.getState().setToastMessage('')}>
+          <div className="popup-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-icon">⚠️</div>
+            <div className="popup-message">{toastMessage}</div>
+            <button className="popup-close-btn" onClick={() => useProjectStore.getState().setToastMessage('')}>
+              Đã hiểu
+            </button>
+          </div>
         </div>
       )}
     </div>
