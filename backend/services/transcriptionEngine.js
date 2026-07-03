@@ -9,9 +9,9 @@ const { transcribeAndTranslate } = require('./geminiService');
 
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
 // A small overlap avoids losing phrases that straddle a cut; duplicates are removed on merge.
-const SEGMENT_SEC = 90;
+const SEGMENT_SEC = 30;
 const OVERLAP_SEC = 2;
-const CONCURRENCY = 2;
+const CONCURRENCY = 6;
 
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {
