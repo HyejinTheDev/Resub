@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 const defaultSubtitleStyle = {
-  fontSize: 17,
+  fontSize: 10,
   color: '#ffffff',
   textColorPreset: 'white-shadow',
   xPercent: 50,

@@ -580,7 +580,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
     'ScriptType: v4.00+',
     `PlayResX: ${width}`,
     `PlayResY: ${height}`,
-    'WrapStyle: 0',
+    'WrapStyle: 2',
     'ScaledBorderAndShadow: yes',
     '',
     '[V4+ Styles]',

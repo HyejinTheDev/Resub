@@ -753,7 +753,7 @@ export default function PreviewPlayer({ videoRef }) {
                 width: '100%',
                 textAlign: 'center',
                 wordBreak: 'break-word',
-                whiteSpace: 'normal',
+                whiteSpace: 'nowrap',
                 pointerEvents: 'none'
               }}
             >
