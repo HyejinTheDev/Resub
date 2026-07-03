@@ -23,8 +23,8 @@ export default function ExportTab() {
   const { capcutCookie } = useSettingsStore();
   const { bgVolume, ttsVolume, videoDimensions, defaultVoice } = usePlaybackStore();
 
-  const [exportResolution, setExportResolution] = useState('original');
-  const [exportQuality, setExportQuality] = useState('medium');
+  const [exportResolution, setExportResolution] = useState('720p');
+  const [exportQuality, setExportQuality] = useState('low');
   const [exportProgress, setExportProgress] = useState(null);
   const [currentExportId, setCurrentExportId] = useState(null);
 
@@ -111,7 +111,9 @@ export default function ExportTab() {
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || 'Failed to export dubbed video');
+        throw new Error(err.error || (response.status === 503
+          ? 'Máy chủ đang quá tải. Vui lòng thử lại sau vài phút.'
+          : 'Failed to export dubbed video'));
       }
 
       const { exportId } = await response.json();
@@ -224,8 +226,8 @@ export default function ExportTab() {
             >
               <option value="original">Gốc (Không thay đổi độ phân giải)</option>
               <option value="1080p">1080p (Sắc nét Full HD)</option>
-              <option value="720p">720p (Tiêu chuẩn HD)</option>
-              <option value="480p">480p (Thấp / Tiết kiệm dung lượng)</option>
+              <option value="720p">720p (HD — xuất nhanh hơn, khuyên dùng)</option>
+              <option value="480p">480p (Thấp / Xuất rất nhanh)</option>
             </select>
           </div>
 
@@ -238,9 +240,9 @@ export default function ExportTab() {
               onChange={(e) => setExportQuality(e.target.value)}
               style={{ width: '100%', padding: '8px', background: 'var(--bg-tertiary)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px' }}
             >
-              <option value="high">Cao (Dung lượng lớn, ít suy hao)</option>
-              <option value="medium">Trung bình (Khuyên dùng)</option>
-              <option value="low">Thấp (Dung lượng nhỏ, xử lý nhanh)</option>
+              <option value="high">Cao (Chất lượng tốt, xuất chậm hơn)</option>
+              <option value="medium">Trung bình (Cân bằng)</option>
+              <option value="low">Thấp (Xuất nhanh nhất — khuyên dùng)</option>
             </select>
           </div>
         </div>

@@ -27,6 +27,13 @@ export const TEXT_PRESETS = [
   { id: 'purple-shadow', name: 'Tím', color: '#a855f7', outlineColor: '#000000', outlineWidth: 2, bg: 'transparent', shadow: true }
 ];
 
-export const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3051/api'
-  : `${window.location.origin}/api`;
+export const API_BASE_URL = (() => {
+  const envApi = import.meta.env.VITE_API_BASE_URL;
+  if (envApi) {
+    return envApi.replace(/\/$/, '');
+  }
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3051/api';
+  }
+  return `${window.location.origin}/api`;
+})();

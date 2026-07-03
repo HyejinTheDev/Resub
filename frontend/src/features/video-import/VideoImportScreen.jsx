@@ -124,7 +124,9 @@ export default function VideoImportScreen() {
       .then(async (response) => {
         if (!response.ok) {
           const err = await response.json();
-          throw new Error(err.error || 'Failed to start transcription');
+          throw new Error(err.error || (response.status === 503
+            ? 'Máy chủ đang quá tải. Vui lòng thử lại sau vài phút.'
+            : 'Failed to start transcription'));
         }
         return response.json();
       })

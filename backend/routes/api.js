@@ -12,6 +12,8 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 const { downloadVideo } = require('../services/downloader');
 const { transcribeSegmented } = require('../services/transcriptionEngine');
 const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
+const { exportQueue, transcribeQueue } = require('../services/taskQueue');
+const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
 
 const router = express.Router();
 
@@ -195,7 +197,10 @@ const storage = multer.diskStorage({
     cb(null, `${uniqueId}${path.extname(file.originalname)}`);
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 150 * 1024 * 1024 } // 150 MB max upload per file
+});
 
 function getFfmpegCommand() {
   const parentFfmpeg = path.join(
@@ -276,8 +281,8 @@ router.post('/download', async (req, res) => {
     res.json({
       success: true,
       videoId,
-      videoUrl: `/downloads/videos/${videoId}.mp4`,
-      audioUrl: `/downloads/audios/${videoId}.mp3`,
+      videoUrl: getFullUrl(req, `/downloads/videos/${videoId}.mp4`),
+      audioUrl: getFullUrl(req, `/downloads/audios/${videoId}.mp3`),
       videoPath,
       audioPath
     });
@@ -312,8 +317,8 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     res.json({
       success: true,
       videoId,
-      videoUrl: `/downloads/videos/${videoId}.mp4`,
-      audioUrl: `/downloads/audios/${videoId}.mp3`,
+      videoUrl: getFullUrl(req, `/downloads/videos/${videoId}.mp4`),
+      audioUrl: getFullUrl(req, `/downloads/audios/${videoId}.mp3`),
       videoPath,
       audioPath
     });
@@ -337,64 +342,91 @@ router.post('/transcribe', async (req, res) => {
     return res.status(404).json({ error: `Audio file not found at path: ${audioPath}` });
   }
 
+  if (!transcribeQueue.hasCapacity()) {
+    return res.status(503).json({
+      error: 'Máy chủ đang quá tải (quá nhiều người nhận dạng cùng lúc). Vui lòng thử lại sau 2–3 phút.'
+    });
+  }
+
   const useSystemPool = !geminiKey;
   console.log(`[api/transcribe] Starting background transcription task: ${taskId} for ${audioPath} (useSystemPool: ${useSystemPool})`);
   
-  // Initialize progress
-  global.transcribeProgress[taskId] = { 
-    status: 'uploading', 
-    percent: 5, 
-    message: 'Khởi tạo tác vụ nhận dạng & dịch thuật...' 
+  global.transcribeProgress[taskId] = {
+    status: 'queued',
+    percent: 2,
+    message: 'Đang chờ lượt xử lý nhận dạng...'
   };
 
-  // Start background process — segmented transcription for tight timing accuracy
-  (async () => {
-    // acquireKey borrows/rotates a key: from the KeyManager pool, or the user-supplied fixed key
-    const acquireKey = async () => {
-      if (!useSystemPool) return geminiKey;
-      return fetchKeyFromManager();
-    };
-    const reportBadKey = async (key, type) => {
-      if (!useSystemPool) return;
-      const isInvalid = type === 'invalid';
-      console.warn(`[api/transcribe] Reporting bad key: ${key.substring(0, 8)}... (isInvalid: ${isInvalid})`);
-      await reportBadKeyToManager(key, type);
-    };
+  transcribeQueue.enqueue(
+    taskId,
+    async () => {
+      global.transcribeProgress[taskId] = {
+        status: 'uploading',
+        percent: 5,
+        message: 'Khởi tạo tác vụ nhận dạng & dịch thuật...'
+      };
 
-    try {
-      if (useSystemPool) {
+      const acquireKey = async () => {
+        if (!useSystemPool) return geminiKey;
+        return fetchKeyFromManager();
+      };
+      const reportBadKey = async (key, type) => {
+        if (!useSystemPool) return;
+        const isInvalid = type === 'invalid';
+        console.warn(`[api/transcribe] Reporting bad key: ${key.substring(0, 8)}... (isInvalid: ${isInvalid})`);
+        await reportBadKeyToManager(key, type);
+      };
+
+      try {
+        if (useSystemPool) {
+          global.transcribeProgress[taskId] = {
+            status: 'uploading',
+            percent: 6,
+            message: 'Đang mượn API Key từ KeyManager...'
+          };
+        }
+
+        const subtitles = await transcribeSegmented(audioPath, {
+          acquireKey,
+          reportBadKey,
+          onProgress: ({ percent, message }) => {
+            global.transcribeProgress[taskId] = { status: 'transcribing', percent, message };
+          }
+        });
+
+        console.log(`[api/transcribe] Task ${taskId} generated ${subtitles.length} merged segments`);
         global.transcribeProgress[taskId] = {
-          status: 'uploading',
-          percent: 6,
-          message: 'Đang mượn API Key từ KeyManager...'
+          status: 'done',
+          percent: 100,
+          subtitles
+        };
+      } catch (error) {
+        console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
+        global.transcribeProgress[taskId] = {
+          status: 'error',
+          percent: 100,
+          error: error.message
         };
       }
-
-      const subtitles = await transcribeSegmented(audioPath, {
-        acquireKey,
-        reportBadKey,
-        onProgress: ({ percent, message }) => {
-          global.transcribeProgress[taskId] = { status: 'transcribing', percent, message };
-        }
-      });
-
-      console.log(`[api/transcribe] Task ${taskId} generated ${subtitles.length} merged segments`);
+    },
+    (position) => {
       global.transcribeProgress[taskId] = {
-        status: 'done',
-        percent: 100,
-        subtitles
+        status: 'queued',
+        percent: 2,
+        message: `Đang chờ lượt nhận dạng (hàng đợi: ${position})...`,
+        queuePosition: position
       };
-    } catch (error) {
-      console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
+    }
+  ).catch((error) => {
+    if (error.queueFull) {
       global.transcribeProgress[taskId] = {
         status: 'error',
         percent: 100,
-        error: error.message
+        error: 'Máy chủ đang quá tải. Vui lòng thử lại sau vài phút.'
       };
     }
-  })();
+  });
 
-  // Return immediately with taskId
   res.json({
     success: true,
     taskId
@@ -447,12 +479,25 @@ router.post('/dub', (req, res) => {
     return res.status(500).json({ error: `Không đọc được thông tin video: ${error.message}` });
   }
 
-  global.dubProgress[exportId] = { status: 'processing', percent: 0, message: 'Khởi tạo tác vụ xuất video...' };
+  if (!exportQueue.hasCapacity()) {
+    return res.status(503).json({
+      error: 'Máy chủ đang quá tải (quá nhiều người xuất video cùng lúc). Vui lòng thử lại sau 2–3 phút.'
+    });
+  }
+
+  global.dubProgress[exportId] = { status: 'queued', percent: 1, message: 'Đang chờ lượt xuất video...' };
   const cancelToken = { cancelled: false, proc: null };
   global.dubTasks[exportId] = cancelToken;
+  const publicBase = getPublicBaseUrl(req);
 
-  (async () => {
-    try {
+  exportQueue.enqueue(
+    exportId,
+    async () => {
+      if (cancelToken.cancelled) {
+        throw new Error('EXPORT_CANCELLED');
+      }
+      global.dubProgress[exportId] = { status: 'processing', percent: 0, message: 'Khởi tạo xuất video...' };
+
       await exportDubbedVideo({
         videoPath,
         subtitles,
@@ -479,22 +524,36 @@ router.post('/dub', (req, res) => {
       global.dubProgress[exportId] = {
         status: 'done',
         percent: 100,
-        videoUrl: `/downloads/exports/${exportId}.mp4`,
+        videoUrl: getFullUrl(publicBase, `/downloads/exports/${exportId}.mp4`),
         outputPath
       };
       console.log(`[api/dub] Export ${exportId} completed successfully.`);
-    } catch (error) {
-      if (cancelToken.cancelled || error.message === 'EXPORT_CANCELLED') {
-        console.log(`[api/dub] Export ${exportId} cancelled by user.`);
-        global.dubProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
-      } else {
-        console.error(`[api/dub] Export ${exportId} failed:`, error.message);
-        global.dubProgress[exportId] = { status: 'error', percent: 100, error: error.message };
-      }
-    } finally {
-      delete global.dubTasks[exportId];
+    },
+    (position) => {
+      global.dubProgress[exportId] = {
+        status: 'queued',
+        percent: 1,
+        message: `Đang chờ lượt xuất video (hàng đợi: ${position})...`,
+        queuePosition: position
+      };
     }
-  })();
+  ).catch((error) => {
+    if (error.queueFull) {
+      global.dubProgress[exportId] = {
+        status: 'error',
+        percent: 100,
+        error: 'Máy chủ đang quá tải. Vui lòng thử lại sau vài phút.'
+      };
+    } else if (cancelToken.cancelled || error.message === 'EXPORT_CANCELLED') {
+      console.log(`[api/dub] Export ${exportId} cancelled by user.`);
+      global.dubProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
+    } else {
+      console.error(`[api/dub] Export ${exportId} failed:`, error.message);
+      global.dubProgress[exportId] = { status: 'error', percent: 100, error: error.message };
+    }
+  }).finally(() => {
+    delete global.dubTasks[exportId];
+  });
 
   res.json({ success: true, exportId });
 });
@@ -509,6 +568,14 @@ router.post('/dub-cancel', (req, res) => {
   const task = global.dubTasks[exportId];
   if (!task) {
     return res.status(404).json({ error: 'Tác vụ xuất video không tồn tại hoặc đã kết thúc.' });
+  }
+
+  const queueResult = exportQueue.cancel(exportId);
+  if (queueResult.removed) {
+    delete global.dubTasks[exportId];
+    global.dubProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
+    console.log(`[api/dub-cancel] Export ${exportId} removed from queue.`);
+    return res.json({ success: true });
   }
 
   task.cancelled = true;
@@ -535,6 +602,15 @@ router.get('/dub-status', (req, res) => {
   res.json(progress);
 });
 
+// Server load / queue status (for monitoring when many users are active)
+router.get('/server-status', (req, res) => {
+  res.json({
+    ok: true,
+    export: exportQueue.getStats(),
+    transcribe: transcribeQueue.getStats()
+  });
+});
+
 // 5. TTS Preview
 router.post('/tts-preview', async (req, res) => {
   const { text, voice, capcutCookie } = req.body;
@@ -553,7 +629,7 @@ router.post('/tts-preview', async (req, res) => {
 
     res.json({
       success: true,
-      audioUrl: `/downloads/temp_tts/${filename}`
+      audioUrl: getFullUrl(req, `/downloads/temp_tts/${filename}`)
     });
   } catch (error) {
     console.error('[api/tts-preview] Error:', error.message);
@@ -599,18 +675,14 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
     const files = fs.readdirSync(splitDirPath);
     const segments = [];
 
-    const PORT = process.env.PORT || 3051;
-    
-    // Sort files to keep correct order
     files.sort().forEach((file, index) => {
       const filePath = path.join(splitDirPath, file);
-      
-      // Get segment duration
+
       const segDurationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
       const duration = parseFloat(cpExecSync(segDurationCmd).toString().trim()) || 0;
 
-      const fileUrl = `/downloads/exports/${splitDirName}/${file}`;
-      
+      const fileUrl = getFullUrl(req, `/downloads/exports/${splitDirName}/${file}`);
+
       segments.push({
         index,
         fileName: `${originalName}_Phần_${index + 1}${videoExt}`,
@@ -662,8 +734,8 @@ router.post('/load-split-segment', async (req, res) => {
     res.json({
       success: true,
       videoId,
-      videoUrl: `/downloads/videos/${videoId}${videoExt}`,
-      audioUrl: `/downloads/audios/${videoId}.mp3`,
+      videoUrl: getFullUrl(req, `/downloads/videos/${videoId}${videoExt}`),
+      audioUrl: getFullUrl(req, `/downloads/audios/${videoId}.mp3`),
       videoPath: targetVideoPath,
       audioPath
     });

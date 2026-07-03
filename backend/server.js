@@ -9,6 +9,9 @@ const apiRouter = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3051;
 
+// Behind Hugging Face / reverse proxy — correct https host for absolute media URLs
+app.set('trust proxy', true);
+
 // Paths configuration for initial folder setup and cleanup
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const VIDEOS_DIR = path.join(DOWNLOADS_DIR, 'videos');
@@ -35,14 +38,21 @@ try {
   console.warn('Failed to clear temp_tts folder on start:', e.message);
 }
 
-app.use(cors());
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
+  : undefined;
+
+app.use(cors({
+  origin: corsOrigins || true,
+  credentials: true
+}));
 app.use(express.json());
 app.use('/downloads', express.static(DOWNLOADS_DIR));
 
 // Register API Router
 app.use('/api', apiRouter);
 
-// Serve React frontend static files in production
+// Serve React frontend static files in production (monolith deploy)
 const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));

@@ -286,6 +286,157 @@ async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcu
 }
 
 /**
+ * Check whether the video file contains an audio stream.
+ */
+async function videoHasAudioStream(videoPath) {
+  try {
+    const ffprobe = getFfprobeCommand();
+    const output = await runCommand(ffprobe, [
+      '-v', 'error',
+      '-select_streams', 'a:0',
+      '-show_entries', 'stream=codec_type',
+      '-of', 'csv=p=0',
+      videoPath
+    ]);
+    return output.trim() === 'audio';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run FFmpeg and surface stderr on failure (supports cancelToken).
+ */
+function runFfmpeg(ffmpeg, args, cancelToken, cwd) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpeg, args, cwd ? { cwd } : undefined);
+    if (cancelToken) cancelToken.proc = proc;
+    let stderr = '';
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('close', (code) => {
+      if (cancelToken) cancelToken.proc = null;
+      if (cancelToken?.cancelled) reject(new Error('EXPORT_CANCELLED'));
+      else if (code === 0) resolve(stderr);
+      else reject(new Error(`FFmpeg failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 500)}`));
+    });
+  });
+}
+
+const TTS_MIX_BATCH_SIZE = 40;
+const AUDIO_BATCH_CONCURRENCY = 2;
+const INTERMEDIATE_AUDIO_ARGS = ['-c:a', 'pcm_s16le', '-ar', '44100', '-ac', '2'];
+
+/**
+ * Estimate MP3 duration from file size (Edge TTS = 48kbps mono). Falls back to ffprobe.
+ */
+async function getMediaDurationFast(filePath) {
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const stat = fs.statSync(filePath);
+    if (stat.size < 64) return 0;
+    if (ext === '.mp3') {
+      // Edge TTS uses 48k bitrate; CapCut/other MP3 is usually >= 64k
+      const bitrate = stat.size < 20000 ? 48000 : 128000;
+      return (stat.size * 8) / bitrate;
+    }
+  } catch { /* fall through */ }
+  return getAudioDuration(filePath);
+}
+
+async function mixOneTtsBatch(ffmpeg, batch, startIndex, ttsVolume, cwd, cancelToken) {
+  const batchPath = path.join(cwd, `tts_batch_${startIndex}.wav`);
+  const args = ['-y'];
+  batch.forEach((file) => args.push('-i', file.path));
+
+  let graph = '';
+  batch.forEach((file, idx) => {
+    graph += `[${idx}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[a${idx}];`;
+  });
+  const labels = batch.map((_, idx) => `[a${idx}]`).join('');
+  graph += `${labels}amix=inputs=${batch.length}:duration=longest:dropout_transition=0:normalize=0[batch]`;
+  args.push('-filter_complex', graph, '-map', '[batch]', ...INTERMEDIATE_AUDIO_ARGS, batchPath);
+  await runFfmpeg(ffmpeg, args, cancelToken, cwd);
+  return batchPath;
+}
+
+/**
+ * Mix many delayed TTS tracks in batches so FFmpeg amix stays reliable.
+ */
+async function mixTtsTracksBatched(ffmpeg, ttsFiles, ttsVolume, outputPath, cancelToken, cwd) {
+  if (ttsFiles.length === 0) return;
+
+  const jobs = [];
+  for (let start = 0; start < ttsFiles.length; start += TTS_MIX_BATCH_SIZE) {
+    jobs.push({ batch: ttsFiles.slice(start, start + TTS_MIX_BATCH_SIZE), start });
+  }
+
+  const batchPaths = new Array(jobs.length);
+  let jobIdx = 0;
+  const batchWorker = async () => {
+    while (jobIdx < jobs.length) {
+      const i = jobIdx++;
+      const job = jobs[i];
+      batchPaths[i] = await mixOneTtsBatch(ffmpeg, job.batch, job.start, ttsVolume, cwd, cancelToken);
+    }
+  };
+  const workers = Math.min(AUDIO_BATCH_CONCURRENCY, jobs.length);
+  await Promise.all(Array.from({ length: workers }, () => batchWorker()));
+
+  if (batchPaths.length === 1) {
+    fs.copyFileSync(batchPaths[0], outputPath);
+    return;
+  }
+
+  const args = ['-y'];
+  batchPaths.forEach((p) => args.push('-i', p));
+  const inputs = batchPaths.map((_, idx) => `[${idx}:a]`).join('');
+  const graph = `${inputs}amix=inputs=${batchPaths.length}:duration=longest:dropout_transition=0:normalize=0[aout]`;
+  args.push('-filter_complex', graph, '-map', '[aout]', ...INTERMEDIATE_AUDIO_ARGS, outputPath);
+  await runFfmpeg(ffmpeg, args, cancelToken, cwd);
+}
+
+/**
+ * Pass A: background audio + all TTS tracks → mixed_audio.m4a
+ */
+async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, cwd) {
+  const hasAudio = await videoHasAudioStream(videoPath);
+  const videoDurSec = await getAudioDuration(videoPath);
+  const safeDur = Math.max(1, Math.ceil(videoDurSec || 60));
+
+  const ttsMixedPath = path.join(cwd, 'tts_only.wav');
+  if (ttsFiles.length > 0) {
+    await mixTtsTracksBatched(ffmpeg, ttsFiles, ttsVolume, ttsMixedPath, cancelToken, cwd);
+  }
+
+  const args = ['-y'];
+  if (hasAudio) {
+    args.push('-i', videoPath);
+  } else {
+    args.push('-f', 'lavfi', '-i', `anullsrc=channel_layout=stereo:sample_rate=44100:d=${safeDur}`);
+  }
+
+  let graph;
+  if (ttsFiles.length > 0) {
+    args.push('-i', ttsMixedPath);
+    graph = `[0:a]volume=${bgVolume}[bg];[1:a]volume=1.0[tts];[bg][tts]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[aout]`;
+  } else {
+    graph = `[0:a]volume=${bgVolume}[aout]`;
+  }
+
+  args.push('-filter_complex', graph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', mixedAudioPath);
+  await runFfmpeg(ffmpeg, args, cancelToken, cwd);
+
+  const stat = fs.statSync(mixedAudioPath);
+  if (stat.size < 500) {
+    throw new Error('Trộn âm thanh thất bại: file audio rỗng. Hãy thử xuất lại.');
+  }
+  const mixedDur = await getAudioDuration(mixedAudioPath);
+  if (mixedDur < 0.3) {
+    throw new Error('Trộn âm thanh thất bại: thời lượng audio quá ngắn. Hãy thử xuất lại.');
+  }
+}
+
+/**
  * Get Audio Duration in seconds using ffprobe (async, non-blocking)
  */
 async function getAudioDuration(filePath) {
@@ -500,7 +651,7 @@ async function exportDubbedVideo({
     }
 
     const usesCapcutVoice = ttsTasks.some(t => (t.sub.voice || voice).startsWith('capcut-'));
-    const concurrency = Math.max(1, Math.min(usesCapcutVoice ? 3 : 6, ttsTasks.length));
+    const concurrency = Math.max(1, Math.min(usesCapcutVoice ? 4 : 10, ttsTasks.length));
     let completedCount = 0;
     let nextTaskIdx = 0;
 
@@ -514,16 +665,19 @@ async function exportDubbedVideo({
         const speedTtsPath = path.join(tempDir, `tts_${task.index}_speed.mp3`);
 
         await generateTTS(task.sub.text, task.sub.voice || voice, rawTtsPath, capcutCookie);
-        const ttsDuration = await getAudioDuration(rawTtsPath);
+        const ttsDuration = await getMediaDurationFast(rawTtsPath);
 
         // Speed up TTS when it overflows the original subtitle interval
         let speed = 1.0;
         if (ttsDuration > task.originalDuration) {
           speed = ttsDuration / task.originalDuration;
         }
-        await adjustAudioSpeed(rawTtsPath, speedTtsPath, speed);
-
-        task.path = speedTtsPath;
+        if (Math.abs(speed - 1.0) < 0.05) {
+          task.path = rawTtsPath;
+        } else {
+          await adjustAudioSpeed(rawTtsPath, speedTtsPath, speed);
+          task.path = speedTtsPath;
+        }
         completedCount++;
         // TTS generation covers 0-55% of overall progress
         onProgress({
@@ -547,33 +701,7 @@ async function exportDubbedVideo({
     onProgress({ percent: 56, message: 'Đang trộn giọng đọc với nhạc nền...' });
 
     const mixedAudioPath = path.join(tempDir, 'mixed_audio.m4a');
-    const audioArgs = ['-y', '-i', videoPath];
-    let audioGraph = `[0:a]volume=${bgVolume}[bg];`;
-    const mixInputs = [];
-    ttsFiles.forEach((file, idx) => {
-      audioArgs.push('-i', file.path);
-      audioGraph += `[${idx + 1}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[tts_${idx}];`;
-      mixInputs.push(`[tts_${idx}]`);
-    });
-    if (mixInputs.length > 0) {
-      audioGraph += `[bg]${mixInputs.join('')}amix=inputs=${1 + mixInputs.length}:duration=first[aout]`;
-    } else {
-      audioGraph = `[0:a]volume=${bgVolume}[aout]`;
-    }
-    audioArgs.push('-filter_complex', audioGraph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', mixedAudioPath);
-
-    await new Promise((resolve, reject) => {
-      const proc = spawn(ffmpeg, audioArgs, { cwd: tempDir });
-      cancelToken.proc = proc;
-      let stderr = '';
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
-      proc.on('close', (code) => {
-        cancelToken.proc = null;
-        if (cancelToken.cancelled) reject(new Error('EXPORT_CANCELLED'));
-        else if (code === 0) resolve();
-        else reject(new Error(`FFmpeg audio mix failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 500)}`));
-      });
-    });
+    await buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, tempDir);
 
     // Video filter graph (transform, blur, crop, scale, subtitles) is built below;
     // segments are appended with a leading ';' and the first one is stripped before use.
@@ -653,6 +781,25 @@ async function exportDubbedVideo({
       }];
     }
 
+    // Scale down before blur so boxblur runs on fewer pixels (major speed win).
+    if (exportResolution && exportResolution !== 'original') {
+      const heightMap = {
+        '1080p': 1080,
+        '720p': 720,
+        '480p': 480
+      };
+      const targetH = heightMap[exportResolution];
+      if (targetH) {
+        const scaleLabel = `scaled_preblur`;
+        filterGraph += `;[${currentVInput}]scale=-2:${targetH}[${scaleLabel}]`;
+        currentVInput = scaleLabel;
+      }
+    }
+
+    const fastBlur = exportQuality === 'low';
+    const blurFrameW = targetWidth;
+    const blurFrameH = targetHeight;
+
     if (activeMasks.length > 0) {
       activeMasks.forEach(mask => {
         const start = parseTimeToMs(mask.startTime) / 1000;
@@ -661,32 +808,40 @@ async function exportDubbedVideo({
         const y = mask.yPercentage || 80;
         const w = mask.widthPercentage !== undefined ? mask.widthPercentage : 80;
         const h = mask.heightPercentage || 15;
-        // FFmpeg rejects boxblur radii above 1/4 of the smallest crop edge (chroma plane is half-size),
-        // so clamp the requested radius to what the mask area actually allows
-        const maskWpx = Math.max(2, Math.round(originalDimensions.width * w / 100));
-        const maskHpx = Math.max(2, Math.round(originalDimensions.height * h / 100));
+        const maskWpx = Math.max(2, Math.round(blurFrameW * w / 100));
+        const maskHpx = Math.max(2, Math.round(blurFrameH * h / 100));
         const maxRadius = Math.max(1, Math.floor(Math.min(maskWpx, maskHpx) / 4) - 1);
         const r = Math.min(mask.blurRadius || 15, maxRadius);
         const hexColor = mask.color || '#000000';
-        const opacity = mask.opacity !== undefined ? mask.opacity : 0.45;
+        const userOpacity = mask.opacity !== undefined ? mask.opacity : 0.15;
+        const coverOpacity = Math.min(1, Math.max(userOpacity, 0.88));
         const ffmpegColor = `0x${hexColor.slice(1)}`;
-        
+
         const mainLabel = `main_${filterIndex}`;
         const cropLabel = `crop_${filterIndex}`;
-        const toBlurLabel = `to_blur_${filterIndex}`;
-        const toMaskLabel = `to_mask_${filterIndex}`;
         const blurredSrcLabel = `blurred_src_${filterIndex}`;
-        const alphaMaskLabel = `alpha_mask_${filterIndex}`;
-        const featheredLabel = `feathered_${filterIndex}`;
         const nextVLabel = `v_${filterIndex + 1}`;
-        
-        filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
-                       `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
-                       `[${toBlurLabel}]boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${opacity}:t=fill[${blurredSrcLabel}];` +
-                       `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.1:y=ih*0.1:w=iw*0.8:h=ih*0.8:color=white:t=fill,boxblur=luma_radius=${r}:luma_power=3[${alphaMaskLabel}];` +
-                       `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
-                       `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
-        
+
+        if (fastBlur) {
+          // Fast path: single blur + opaque cover, no alphamerge feather
+          filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
+                         `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,` +
+                         `boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
+                         `[${mainLabel}][${blurredSrcLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
+        } else {
+          const toBlurLabel = `to_blur_${filterIndex}`;
+          const toMaskLabel = `to_mask_${filterIndex}`;
+          const alphaMaskLabel = `alpha_mask_${filterIndex}`;
+          const featheredLabel = `feathered_${filterIndex}`;
+
+          filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
+                         `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
+                         `[${toBlurLabel}]boxblur=luma_radius=${r}:luma_power=5,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
+                         `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.03:y=ih*0.03:w=iw*0.94:h=ih*0.94:color=white:t=fill,boxblur=luma_radius=${Math.max(1, Math.floor(r / 2))}:luma_power=2[${alphaMaskLabel}];` +
+                         `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
+                         `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
+        }
+
         currentVInput = nextVLabel;
         filterIndex++;
       });
@@ -704,21 +859,6 @@ async function exportDubbedVideo({
       currentVInput = cropLabel;
     }
 
-    // Apply final scale if requested
-    if (exportResolution && exportResolution !== 'original') {
-      const heightMap = {
-        '1080p': 1080,
-        '720p': 720,
-        '480p': 480
-      };
-      const targetH = heightMap[exportResolution];
-      if (targetH) {
-        const scaleLabel = `scaled_final`;
-        filterGraph += `;[${currentVInput}]scale=-2:${targetH}[${scaleLabel}]`;
-        currentVInput = scaleLabel;
-      }
-    }
-
     // Burn-in subtitles on the final cropped stream (ass filter runs with cwd=tempDir)
     filterGraph += `;[${currentVInput}]ass=subtitles.ass[vout]`;
     // Filter segments are appended with a leading ';' — strip it for a valid graph
@@ -726,13 +866,17 @@ async function exportDubbedVideo({
 
     // 5. Pass B: encode video with just 2 inputs (video + pre-mixed audio)
     const qualityCrfMap = {
-      'high': '18',
+      'high': '20',
       'medium': '23',
       'low': '28'
     };
+    const presetMap = {
+      'high': 'veryfast',
+      'medium': 'superfast',
+      'low': 'ultrafast'
+    };
     const crfValue = qualityCrfMap[exportQuality] || '23';
-    // "low" quality favors speed with a faster preset; medium/high keep veryfast
-    const presetValue = exportQuality === 'low' ? 'superfast' : 'veryfast';
+    const presetValue = presetMap[exportQuality] || 'superfast';
 
     const ffmpegArgs = [
       '-y',
@@ -740,12 +884,16 @@ async function exportDubbedVideo({
       '-i', mixedAudioPath,
       '-filter_complex', filterGraph,
       '-map', '[vout]',
-      '-map', '1:a',
+      '-map', '1:a:0',
       '-c:v', 'libx264',
       '-crf', crfValue,
       '-preset', presetValue,
-      '-c:a', 'copy',
-      '-shortest',
+      '-threads', '0',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-ar', '44100',
+      '-ac', '2',
+      '-movflags', '+faststart',
       outputPath
     ];
 
