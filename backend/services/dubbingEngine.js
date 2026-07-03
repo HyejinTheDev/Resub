@@ -222,7 +222,13 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
     throw new Error('CapCut TTS API did not return any audio materials');
   }
 
-  const audioUrl = json.data.tts_materials[0].meta_data.url;
+  const metaData = json.data.tts_materials[0].meta_data;
+  if (!metaData || !metaData.url) {
+    console.error('[CapCutTTS] Response missing audio URL. tts_materials[0]:', JSON.stringify(json.data.tts_materials[0]).substring(0, 500));
+    throw new Error('CapCut không trả về file âm thanh. Cookie CapCut có thể đã hết hạn hoặc tài khoản bị giới hạn — hãy đăng nhập lại capcut.com, lấy cookie mới và dán vào thanh menu trên cùng. Hoặc chuyển sang giọng Edge TTS (Hoài My / Nam Minh) để không cần cookie.');
+  }
+
+  const audioUrl = metaData.url;
   
   // Download the generated mp3 file
   const downloadRes = await fetchUrl(audioUrl, 'GET');
