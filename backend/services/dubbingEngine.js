@@ -390,6 +390,68 @@ function generateSrtFile(subtitles, srtPath) {
   fs.writeFileSync(srtPath, content, 'utf-8');
 }
 
+/**
+ * Format milliseconds into ASS timestamp (H:MM:SS.cc)
+ */
+function formatMsToAssTime(ms) {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor(ms / 60000) % 60;
+  const s = Math.floor(ms / 1000) % 60;
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+/**
+ * Generate an ASS subtitle file where every line is anchored with \an5\pos at the
+ * exact center point the editor preview uses — so burned-in subtitles match the
+ * position, size and wrap width seen while editing.
+ */
+function generateAssFile(subtitles, assPath, { width, height, fontSize, style }) {
+  const s = style || {};
+  const primary = hexToAssColor(s.color || '#ffffff');
+  const isBoxPreset = s.textColorPreset && s.textColorPreset.includes('-bg');
+  const borderStyle = isBoxPreset ? 3 : 1;
+  const outlineColour = isBoxPreset ? '&H80000000' : hexToAssColor(s.outlineColor || '#000000');
+  const outline = isBoxPreset ? 2 : (s.outlineWidth !== undefined ? s.outlineWidth : 2);
+  const bold = s.bold ? -1 : 0;
+  const italic = s.italic ? -1 : 0;
+
+  const xPercent = s.xPercent !== undefined ? s.xPercent : 50;
+  const yPercent = s.yPercent !== undefined ? s.yPercent : 85;
+  const wPercent = s.widthPercent !== undefined ? s.widthPercent : 80;
+  const cx = Math.round(width * xPercent / 100);
+  const cy = Math.round(height * yPercent / 100);
+  // Wrap width comes from left/right margins; \pos only moves the anchor point
+  const marginH = Math.max(0, Math.round(((100 - wPercent) / 2) / 100 * width));
+
+  const header = [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    `PlayResX: ${width}`,
+    `PlayResY: ${height}`,
+    'WrapStyle: 0',
+    'ScaledBorderAndShadow: yes',
+    '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},0,5,${marginH},${marginH},0,1`,
+    '',
+    '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
+  ].join('\n');
+
+  const events = subtitles.map((sub) => {
+    const startMs = parseTimeToMs(sub.startTime);
+    const endMs = parseTimeToMs(sub.endTime);
+    const text = String(sub.text || '')
+      .replace(/[{}]/g, '')
+      .replace(/\r?\n/g, '\\N');
+    return `Dialogue: 0,${formatMsToAssTime(startMs)},${formatMsToAssTime(endMs)},Default,,0,0,0,,{\\an5\\pos(${cx},${cy})}${text}`;
+  }).join('\n');
+
+  fs.writeFileSync(assPath, `${header}\n${events}\n`, 'utf-8');
+}
+
 function hexToAssColor(hex) {
   if (!hex || hex === 'transparent') return '&HFF000000';
   const r = hex.slice(1, 3);
@@ -517,10 +579,6 @@ async function exportDubbedVideo({
     // segments are appended with a leading ';' and the first one is stripped before use.
     let filterGraph = '';
 
-    // 3. Subtitles SRT generation
-    const srtPath = path.join(tempDir, 'subtitles.srt');
-    generateSrtFile(subtitles, srtPath);
-
     // Get original video dimensions to calculate accurate margins and crop sizes
     const originalDimensions = await getVideoDimensions(videoPath);
     let targetWidth = originalDimensions.width;
@@ -548,39 +606,20 @@ async function exportDubbedVideo({
       }
     }
 
-    // 4. Video filter graph for blur mask and subtitles
-    let forceStyle = "FontName=Arial,Alignment=2,WrapStyle=0";
-    if (subtitleStyle) {
-      const fs = subtitleStyle.fontSize || 17;
-      // Scale font relative to video height (baseline: 720p)
-      const scaleFactor = targetHeight / 720;
-      const assFontSize = Math.round(fs * scaleFactor);
-      forceStyle += `,FontSize=${assFontSize}`;
-      
-      const textColor = subtitleStyle.color || '#ffffff';
-      forceStyle += `,PrimaryColour=${hexToAssColor(textColor)}`;
-      
-      if (subtitleStyle.textColorPreset && subtitleStyle.textColorPreset.includes('-bg')) {
-        forceStyle += `,BorderStyle=3,OutlineColour=&H80000000,Outline=2`;
-      } else {
-        forceStyle += `,BorderStyle=1`;
-        const outlineColor = subtitleStyle.outlineColor || '#000000';
-        const outlineWidth = subtitleStyle.outlineWidth !== undefined ? subtitleStyle.outlineWidth : 2;
-        forceStyle += `,OutlineColour=${hexToAssColor(outlineColor)},Outline=${outlineWidth}`;
-      }
-      
-      const y = subtitleStyle.yPercent !== undefined ? subtitleStyle.yPercent : 85;
-      // MarginV = distance from bottom of video to the subtitle baseline
-      // yPercent is measured from top (CSS style), so distance from bottom = (100 - y)%
-      const marginV = Math.max(10, Math.round(targetHeight * (100 - y) / 100));
-      forceStyle += `,MarginV=${marginV}`;
+    // 4. Subtitle file generation — ASS with exact anchor point matching the preview.
+    // The editor preview renders inside a 480px-wide container, so a CSS font of
+    // `fs` px corresponds to fs/480 of the video WIDTH.
+    const PREVIEW_WIDTH = 480;
+    const cssFontSize = (subtitleStyle && subtitleStyle.fontSize) || 17;
+    const assFontSize = Math.max(8, Math.round(cssFontSize * (targetWidth / PREVIEW_WIDTH)));
 
-      const wPercent = subtitleStyle.widthPercent !== undefined ? subtitleStyle.widthPercent : 80;
-      const marginH = Math.round(((100 - wPercent) / 2) / 100 * targetWidth);
-      forceStyle += `,MarginL=${marginH},MarginR=${marginH}`;
-    } else {
-      forceStyle += `,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,MarginV=30`;
-    }
+    const assPath = path.join(tempDir, 'subtitles.ass');
+    generateAssFile(subtitles, assPath, {
+      width: targetWidth,
+      height: targetHeight,
+      fontSize: assFontSize,
+      style: subtitleStyle
+    });
 
     // Process blur segments on original video size
     const { zoom = 100, xOffset = 0, yOffset = 0, rotation = 0 } = videoTransform || {};
@@ -680,8 +719,8 @@ async function exportDubbedVideo({
       }
     }
 
-    // Burn-in subtitles on the final cropped stream
-    filterGraph += `;[${currentVInput}]subtitles=subtitles.srt:force_style='${forceStyle}'[vout]`;
+    // Burn-in subtitles on the final cropped stream (ass filter runs with cwd=tempDir)
+    filterGraph += `;[${currentVInput}]ass=subtitles.ass[vout]`;
     // Filter segments are appended with a leading ';' — strip it for a valid graph
     filterGraph = filterGraph.replace(/^;/, '');
 
