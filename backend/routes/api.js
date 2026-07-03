@@ -559,11 +559,6 @@ router.post('/split-video', upload.single('video'), async (req, res) => {
     const durationCmd = `"${ffprobe}" -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const originalDuration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
 
-    if (originalDuration > 600) {
-      fs.unlinkSync(videoPath);
-      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 10 phút (600 giây).' });
-    }
-
     // 2. Perform splitting
     const outputPattern = path.join(splitDirPath, `part_%03d${videoExt}`);
     
