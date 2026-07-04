@@ -580,7 +580,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
     'ScriptType: v4.00+',
     `PlayResX: ${width}`,
     `PlayResY: ${height}`,
-    'WrapStyle: 0',
+    'WrapStyle: 2',
     'ScaledBorderAndShadow: yes',
     '',
     '[V4+ Styles]',
@@ -594,10 +594,21 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
   const events = subtitles.map((sub) => {
     const startMs = parseTimeToMs(sub.startTime);
     const endMs = parseTimeToMs(sub.endTime);
-    const text = String(sub.text || '')
+    const cleanText = String(sub.text || '')
       .replace(/[{}]/g, '')
-      .replace(/\r?\n/g, '\\N');
-    return `Dialogue: 0,${formatMsToAssTime(startMs)},${formatMsToAssTime(endMs)},Default,,0,0,0,,{\\an5\\pos(${cx},${cy})}${text}`;
+      .replace(/\r?\n/g, ' ');
+
+    const baseSize = fontSize;
+    const wPercent = s.widthPercent !== undefined ? s.widthPercent : 80;
+    const allowedWidth = Math.round(width * wPercent / 100);
+    const approxTextWidth = cleanText.length * baseSize * 0.52;
+    
+    let lineFontSize = baseSize;
+    if (approxTextWidth > allowedWidth && cleanText.length > 0) {
+      lineFontSize = Math.max(6, Math.floor(allowedWidth / (cleanText.length * 0.52)));
+    }
+
+    return `Dialogue: 0,${formatMsToAssTime(startMs)},${formatMsToAssTime(endMs)},Default,,0,0,0,,{\\an5\\pos(${cx},${cy})\\fs${lineFontSize}}${cleanText}`;
   }).join('\n');
 
   fs.writeFileSync(assPath, `${header}\n${events}\n`, 'utf-8');

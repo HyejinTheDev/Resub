@@ -738,7 +738,17 @@ export default function PreviewPlayer({ videoRef }) {
             <div 
               className={`subtitle-text ${isAnyMaskActiveAtCurrentTime ? 'no-bg' : ''}`}
               style={{
-                fontSize: `${subtitleStyle.fontSize}px`,
+                fontSize: (() => {
+                  const baseSize = subtitleStyle.fontSize || 10;
+                  const text = subtitles[activeSubtitleIndex]?.text || '';
+                  const container = document.querySelector('.subtitle-overlay');
+                  const containerWidth = container ? container.clientWidth : 480;
+                  const approxTextWidth = text.length * baseSize * 0.52;
+                  if (approxTextWidth > containerWidth && text.length > 0) {
+                    return `${Math.max(6, Math.floor(containerWidth / (text.length * 0.52)))}px`;
+                  }
+                  return `${baseSize}px`;
+                })(),
                 color: subtitleStyle.color,
                 backgroundColor: subtitleStyle.bg || 'transparent',
                 borderColor: subtitleStyle.outlineColor,
@@ -753,7 +763,7 @@ export default function PreviewPlayer({ videoRef }) {
                 width: '100%',
                 textAlign: 'center',
                 wordBreak: 'break-word',
-                whiteSpace: 'pre-wrap',
+                whiteSpace: 'nowrap',
                 pointerEvents: 'none'
               }}
             >
