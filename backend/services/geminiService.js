@@ -16,13 +16,10 @@ const SUBTITLE_SCHEMA = {
   }
 };
 
-// Prefer Gemini 2.5 first: it respects short-segment timing far better than 2.0.
+// Prioritize gemini-1.5-flash as the most stable and available model.
 const TRANSCRIBE_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash',
-  'gemini-1.5-flash'
+  'gemini-1.5-flash',
+  'gemini-2.5-flash'
 ];
 
 /**
@@ -146,8 +143,7 @@ async function detectSubtitlePosition(videoPath, timestampSec, apiKey) {
     const frameBuffer = fs.readFileSync(tempFramePath);
     const base64Frame = frameBuffer.toString('base64');
 
-    // 3. Call Gemini
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-1.5-flash';
     console.log(`[geminiService] Detecting subtitle position using model: ${model} at ${timestampSec.toFixed(2)}s...`);
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
