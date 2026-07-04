@@ -244,7 +244,10 @@ export default function App() {
     setActiveSubtitleIndex(index);
   }, [currentTime, subtitles]);
 
-
+  const progressLabel =
+    statusMessage.includes('tải video') || statusMessage.includes('Tải video')
+      ? 'Tiến trình tải video lên'
+      : 'Tiến trình nhận dạng & dịch (AI)';
 
   return (
     <div className="app-container">
@@ -371,7 +374,7 @@ export default function App() {
                     <div style={{ width: `${uploadProgress}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e, #10b981)', borderRadius: '10px', transition: 'width 0.2s ease-out' }}></div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                    <span>Tiến trình tải lên</span>
+                    <span>{progressLabel}</span>
                     <span>{uploadProgress}%</span>
                   </div>
                 </div>

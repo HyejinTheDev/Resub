@@ -9,9 +9,9 @@ const { transcribeAndTranslate } = require('./geminiService');
 
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
 // A small overlap avoids losing phrases that straddle a cut; duplicates are removed on merge.
-const SEGMENT_SEC = 30;
+const SEGMENT_SEC = 120;
 const OVERLAP_SEC = 2;
-const CONCURRENCY = 6;
+const CONCURRENCY = 3;
 
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -89,6 +89,24 @@ function cutAudioSegment(sourcePath, outPath, startSec, lengthSec) {
   });
 }
 
+/** Accept compact [start, end, chinese, vi] arrays or legacy object items from Gemini. */
+function normalizeSubtitleItem(item) {
+  if (Array.isArray(item)) {
+    return {
+      startTime: item[0],
+      endTime: item[1],
+      chineseText: item[2] || '',
+      text: item[3] || ''
+    };
+  }
+  return {
+    startTime: item.startTime,
+    endTime: item.endTime,
+    chineseText: item.chineseText || '',
+    text: item.text || ''
+  };
+}
+
 /**
  * Process one audio segment through Gemini with per-segment key failover.
  * Returns subtitles with timestamps already offset to absolute video time.
@@ -110,9 +128,10 @@ async function processSegment(segment, keyState, reportBadKey, acquireKey) {
       const segmentEndMs = (segment.startSec + segment.lengthSec) * 1000;
       return (raw || [])
         .map((item) => {
-          const startMs = parseTimeToMs(item.startTime) + offsetMs;
-          const endMs = parseTimeToMs(item.endTime) + offsetMs;
-          return { startMs, endMs, chineseText: item.chineseText || '', text: item.text || '' };
+          const norm = normalizeSubtitleItem(item);
+          const startMs = parseTimeToMs(norm.startTime) + offsetMs;
+          const endMs = parseTimeToMs(norm.endTime) + offsetMs;
+          return { startMs, endMs, chineseText: norm.chineseText, text: norm.text };
         })
         // Drop invalid or empty items and anything that spills far past the segment
         .filter((s) => s.endMs > s.startMs && (s.text.trim() || s.chineseText.trim()) && s.startMs < segmentEndMs + 1500);

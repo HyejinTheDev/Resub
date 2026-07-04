@@ -2,20 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
-// Structured schema forces Gemini to return well-formed timestamped items and
-// prevents malformed / drifting output on longer inputs.
+// Compact array schema — ~60% fewer output tokens than object keys per subtitle line.
 const SUBTITLE_SCHEMA = {
   type: 'array',
   items: {
-    type: 'object',
-    properties: {
-      startTime: { type: 'string', description: 'Start time in format MMmSSsNNNms (e.g. "00m00s500ms")' },
-      endTime: { type: 'string', description: 'End time in format MMmSSsNNNms (e.g. "00m03s500ms")' },
-      chineseText: { type: 'string', description: 'Original Chinese transcription' },
-      text: { type: 'string', description: 'Natural Vietnamese translation' }
-    },
-    required: ['startTime', 'endTime', 'chineseText', 'text'],
-    propertyOrdering: ['startTime', 'endTime', 'chineseText', 'text']
+    type: 'array',
+    items: { type: 'string' },
+    minItems: 4,
+    maxItems: 4,
+    description: '0: startTime, 1: endTime, 2: chineseText, 3: Vietnamese text'
   }
 };
 
@@ -43,14 +38,10 @@ async function transcribeAndTranslate(audioPath, apiKey, options = {}) {
 2. Transcribe the original Chinese text exactly.
 3. Translate it directly into natural, context-appropriate Vietnamese.
 
-Your response MUST be a JSON array only. Follow this exact JSON structure:
+Your response MUST be a JSON array only. Each item is a 4-element array: [startTime, endTime, chineseText, vietnameseText].
+Follow this exact JSON structure:
 [
-  {
-    "startTime": "00m01s200ms",
-    "endTime": "00m03s500ms",
-    "chineseText": "你拼出来就知道了",
-    "text": "Cậu ghép thử xem là biết ngay."
-  }
+  ["00m01s200ms", "00m03s500ms", "你拼出来就知道了", "Cậu ghép thử xem là biết ngay."]
 ]
 
 IMPORTANT RULES:
