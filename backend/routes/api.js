@@ -237,7 +237,9 @@ function extractAudio(videoPath, audioPath) {
       '-i', videoPath,
       '-vn',
       '-acodec', 'libmp3lame',
-      '-q:a', '2',
+      '-ac', '1',
+      '-ar', '16000',
+      '-ab', '64k',
       audioPath
     ];
 
