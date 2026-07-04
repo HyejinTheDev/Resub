@@ -79,6 +79,40 @@ export default function ExportTab() {
     });
   };
 
+  const getLastSubTimeSec = () => {
+    if (!subtitles || subtitles.length === 0) return 0;
+    const lastSub = subtitles[subtitles.length - 1];
+    const match = lastSub.endTime.match(/(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?/);
+    if (!match) return 0;
+    const m = parseInt(match[1]) || 0;
+    const s = parseInt(match[2]) || 0;
+    const ms = parseInt(match[3]) || 0;
+    return m * 60 + s + ms / 1000;
+  };
+
+  const getEstimatedTimeStr = () => {
+    const duration = getLastSubTimeSec();
+    if (duration <= 0) return '';
+    
+    let multiplier = 0.25; // default medium 720p / balance
+    if (exportResolution === '480p' || exportQuality === 'low') {
+      multiplier = 0.15; // low/480p
+    } else if (exportResolution === '1080p' || exportQuality === 'high') {
+      multiplier = 0.7; // high/1080p
+    }
+    
+    // Add extra time if hardsub is checked
+    if (burnSubtitles) {
+      multiplier += 0.05;
+    }
+    
+    const estSec = Math.max(5, Math.round(duration * multiplier));
+    const mins = Math.floor(estSec / 60);
+    const secs = estSec % 60;
+    
+    return mins > 0 ? `${mins} phút ${secs} giây` : `${secs} giây`;
+  };
+
   const handleExportVideo = async () => {
     if (subtitles.length === 0 || !videoData) return;
     setIsExporting(true);
@@ -261,6 +295,13 @@ export default function ExportTab() {
               Chèn cứng phụ đề vào video (Xuất chậm hơn)
             </label>
           </div>
+
+          {/* Thời gian xuất dự kiến */}
+          {getLastSubTimeSec() > 0 && (
+            <div style={{ marginTop: '12px', padding: '10px', borderRadius: '6px', background: 'rgba(234,179,8,0.06)', border: '1px dashed rgba(234,179,8,0.3)', fontSize: '12px', color: '#eab308' }}>
+              ⏱️ <strong>Thời gian xuất ước tính:</strong> ~{getEstimatedTimeStr()} (Dự kiến trên server miễn phí)
+            </div>
+          )}
         </div>
       )}
 

@@ -3,8 +3,22 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const https = require('https');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { EdgeTTS } = require('node-edge-tts');
+
+// Mappings for FFmpeg video quality preset & CRF (Constant Rate Factor)
+const qualityCrfMap = {
+  high: '18',
+  medium: '23',
+  low: '28'
+};
+
+const presetMap = {
+  high: 'medium',
+  medium: 'superfast',
+  low: 'ultrafast'
+};
 
 function fetchUrl(url, method = 'GET', headers = {}, body = null) {
   return new Promise((resolve, reject) => {
@@ -263,25 +277,45 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
   return outputPath;
 }
 
-/**
- * Generate audio speech from text using Microsoft Edge TTS, FPT.AI, or CapCut TTS
- */
 async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcutCookie = '') {
-  if (voice.startsWith('capcut-')) {
-    // Use env var as fallback if no cookie provided from frontend
-    const cookie = capcutCookie || process.env.CAPCUT_COOKIE || '';
-    await generateCapCutTTS(text, voice, outputPath, cookie);
+  const cleanText = (text || '').trim();
+  const cleanVoice = (voice || '').trim();
+  
+  // Calculate unique MD5 hash for cache file
+  const hashInput = `${cleanText}_${cleanVoice}_${voice.startsWith('capcut-') ? capcutCookie : ''}`;
+  const hash = crypto.createHash('md5').update(hashInput).digest('hex');
+  
+  const cacheDir = path.join(__dirname, '..', 'cache', 'tts');
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  const cacheFilePath = path.join(cacheDir, `${hash}.mp3`);
+
+  // Return cached file if it exists
+  if (fs.existsSync(cacheFilePath)) {
+    console.log(`[dubbingEngine] TTS Cache hit for: "${cleanText.substring(0, 30)}..."`);
+    fs.copyFileSync(cacheFilePath, outputPath);
     return outputPath;
   }
 
-  const cleanVoice = voice.replace('edge-', '');
-  const tts = new EdgeTTS({
-    voice: cleanVoice,
-    lang: cleanVoice.substring(0, 5), // e.g. 'vi-VN'
-    outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
-  });
-  
-  await tts.ttsPromise(text, outputPath);
+  // Generate new TTS file
+  if (voice.startsWith('capcut-')) {
+    const cookie = capcutCookie || process.env.CAPCUT_COOKIE || '';
+    await generateCapCutTTS(cleanText, voice, outputPath, cookie);
+  } else {
+    const cleanVoiceName = cleanVoice.replace('edge-', '');
+    const tts = new EdgeTTS({
+      voice: cleanVoiceName,
+      lang: cleanVoiceName.substring(0, 5), // e.g. 'vi-VN'
+      outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+    });
+    await tts.ttsPromise(cleanText, outputPath);
+  }
+
+  // Save to cache for subsequent exports
+  if (fs.existsSync(outputPath)) {
+    fs.copyFileSync(outputPath, cacheFilePath);
+  }
   return outputPath;
 }
 
