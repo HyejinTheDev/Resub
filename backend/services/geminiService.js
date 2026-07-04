@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 const axios = require('axios');
 
 // Compact array schema — ~60% fewer output tokens than object keys per subtitle line.
@@ -110,6 +112,94 @@ IMPORTANT RULES:
   throw lastError;
 }
 
+/**
+ * Extract a frame from the video at a given timestamp and use Gemini to detect the vertical range of subtitles.
+ */
+async function detectSubtitlePosition(videoPath, timestampSec, apiKey) {
+  const tempFramePath = path.join(os.tmpdir(), `subtitle_frame_${Date.now()}.jpg`);
+  
+  // Replicate getFfmpegCommand logic locally to avoid circular dependencies
+  const parentFfmpeg = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'oneclick-subtitles-generator',
+    'node_modules',
+    '@ffmpeg-installer',
+    'ffmpeg',
+    process.platform === 'win32' ? 'bin/win32/x64/ffmpeg.exe' : 'bin/linux/x64/ffmpeg'
+  );
+  const ffmpeg = fs.existsSync(parentFfmpeg) ? parentFfmpeg : 'ffmpeg';
+  const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+
+  try {
+    // 1. Extract frame
+    const extractCmd = `${safeFfmpeg} -y -ss ${timestampSec.toFixed(3)} -i "${videoPath}" -vframes 1 -q:v 2 "${tempFramePath}"`;
+    execSync(extractCmd, { stdio: 'ignore' });
+
+    if (!fs.existsSync(tempFramePath)) {
+      throw new Error('Failed to extract frame');
+    }
+
+    // 2. Read frame as Base64
+    const frameBuffer = fs.readFileSync(tempFramePath);
+    const base64Frame = frameBuffer.toString('base64');
+
+    // 3. Call Gemini
+    const model = 'gemini-2.5-flash';
+    console.log(`[geminiService] Detecting subtitle position using model: ${model} at ${timestampSec.toFixed(2)}s...`);
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: base64Frame
+                }
+              },
+              {
+                text: 'Analyze this video frame. Locate the burned-in subtitles (usually in Chinese, at the bottom or center). Identify their bounding box height: what is the vertical range they occupy as percentages of the total image height (from 0 at the top to 100 at the bottom)? Return ONLY a JSON array of two numbers: [startYPercentage, endYPercentage]. Example: [78, 90]. Do not add any text or explanation.'
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'array',
+            items: { type: 'number' },
+            minItems: 2,
+            maxItems: 2
+          }
+        }
+      }
+    );
+
+    const outputText = response.data.candidates[0].content.parts[0].text;
+    const parsedJson = JSON.parse(outputText.trim());
+    if (Array.isArray(parsedJson) && parsedJson.length === 2) {
+      const [startY, endY] = parsedJson;
+      const yPercentage = Math.round((startY + endY) / 2);
+      const heightPercentage = Math.max(5, Math.min(40, Math.round(endY - startY) + 4)); // add margin
+      console.log(`[geminiService] Detected subtitle Y: ${yPercentage}%, Height: ${heightPercentage}%`);
+      return { yPercentage, heightPercentage };
+    }
+    throw new Error('Invalid coordinates returned from Gemini');
+  } catch (error) {
+    console.warn('[geminiService] Subtitle detection failed, using fallback:', error.message);
+    return { yPercentage: 78, heightPercentage: 15 }; // Default fallback
+  } finally {
+    try {
+      if (fs.existsSync(tempFramePath)) fs.unlinkSync(tempFramePath);
+    } catch {}
+  }
+}
+
 module.exports = {
-  transcribeAndTranslate
+  transcribeAndTranslate,
+  detectSubtitlePosition
 };

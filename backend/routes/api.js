@@ -14,6 +14,7 @@ const { transcribeSegmented } = require('../services/transcriptionEngine');
 const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
 const { exportQueue, transcribeQueue } = require('../services/taskQueue');
 const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
+const { detectSubtitlePosition } = require('../services/geminiService');
 
 const router = express.Router();
 
@@ -334,7 +335,7 @@ global.transcribeProgress = global.transcribeProgress || {};
 
 // 3. Transcribe & Translate (Async Background Task with Rotation & Failover)
 router.post('/transcribe', async (req, res) => {
-  const { audioPath, geminiKey, taskId } = req.body;
+  const { audioPath, videoPath, geminiKey, taskId } = req.body;
   if (!audioPath || !taskId) {
     return res.status(400).json({ error: 'audioPath and taskId are required' });
   }
@@ -395,11 +396,50 @@ router.post('/transcribe', async (req, res) => {
           }
         });
 
+        // Auto-detect subtitle Y position using Gemini on a keyframe
+        let detectedPosition = null;
+        if (videoPath && subtitles && subtitles.length > 0) {
+          global.transcribeProgress[taskId] = {
+            status: 'transcribing',
+            percent: 99,
+            message: 'Đang tự động định vị chiều cao phụ đề gốc...'
+          };
+          try {
+            // Pick a subtitle segment that is reasonably long for best keyframe extraction
+            const parseTimeToSecondsLocal = (timeStr) => {
+              const match = timeStr.match(/(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?/);
+              if (!match) return 0;
+              const m = parseInt(match[1]) || 0;
+              const s = parseInt(match[2]) || 0;
+              const ms = parseInt(match[3]) || 0;
+              return m * 60 + s + ms / 1000;
+            };
+
+            const targetSub = subtitles.find(s => {
+              const start = parseTimeToSecondsLocal(s.startTime);
+              const end = parseTimeToSecondsLocal(s.endTime);
+              return (end - start) >= 1.5;
+            }) || subtitles[0];
+
+            if (targetSub) {
+              const start = parseTimeToSecondsLocal(targetSub.startTime);
+              const end = parseTimeToSecondsLocal(targetSub.endTime);
+              const midSec = (start + end) / 2;
+
+              const activeKey = await acquireKey();
+              detectedPosition = await detectSubtitlePosition(videoPath, midSec, activeKey);
+            }
+          } catch (detError) {
+            console.warn('[api/transcribe] Failed to automatically detect subtitle Y-coordinate:', detError.message);
+          }
+        }
+
         console.log(`[api/transcribe] Task ${taskId} generated ${subtitles.length} merged segments`);
         global.transcribeProgress[taskId] = {
           status: 'done',
           percent: 100,
-          subtitles
+          subtitles,
+          detectedPosition
         };
       } catch (error) {
         console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);

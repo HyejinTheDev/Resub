@@ -11,7 +11,8 @@ export default function MaskTab() {
     setBlurMasks,
     handleDeleteBlurMask,
     handleAddBlurMask,
-    saveHistory
+    saveHistory,
+    videoData
   } = useProjectStore();
 
   const { currentTime, videoDuration } = usePlaybackStore();
@@ -24,9 +25,9 @@ export default function MaskTab() {
       startTime: formatSecondsToCustomTime(startSecs),
       endTime: formatSecondsToCustomTime(endSecs),
       xPercentage: 50,
-      yPercentage: 75,
+      yPercentage: videoData?.detectedSubtitleY !== undefined ? videoData.detectedSubtitleY : 75,
       widthPercentage: 80,
-      heightPercentage: 15,
+      heightPercentage: videoData?.detectedSubtitleHeight !== undefined ? videoData.detectedSubtitleHeight : 15,
       blurRadius: 15,
       color: '#000000',
       opacity: 0.15
@@ -42,15 +43,14 @@ export default function MaskTab() {
       startTime: formatSecondsToCustomTime(startSecs),
       endTime: formatSecondsToCustomTime(endSecs),
       xPercentage: 50,
-      yPercentage: 75,
+      yPercentage: videoData?.detectedSubtitleY !== undefined ? videoData.detectedSubtitleY : 75,
       widthPercentage: 80,
-      heightPercentage: 15,
+      heightPercentage: videoData?.detectedSubtitleHeight !== undefined ? videoData.detectedSubtitleHeight : 15,
       blurRadius: 15,
       color: '#000000',
       opacity: 0.15
     };
     handleAddBlurMask(newBlur);
-  };
 
   const setMaskToFullDuration = () => {
     saveHistory();

@@ -15,7 +15,9 @@ export default function VideoImportScreen() {
     setSubtitles,
     showToast,
     uploadProgress,
-    setUploadProgress
+    setUploadProgress,
+    subtitleStyle,
+    setSubtitleStyle
   } = useProjectStore();
 
   // Split Video States
@@ -110,7 +112,7 @@ export default function VideoImportScreen() {
     }
   };
 
-  const handleTranscribe = (audioPath) => {
+  const handleTranscribe = (audioPath, videoPath) => {
     return new Promise((resolve, reject) => {
       const taskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       setStatusMessage('Đang khởi tạo dịch thuật phụ đề...');
@@ -119,7 +121,7 @@ export default function VideoImportScreen() {
       fetch(`${API_BASE_URL}/transcribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioPath, geminiKey, taskId })
+        body: JSON.stringify({ audioPath, videoPath, geminiKey, taskId })
       })
       .then(async (response) => {
         if (!response.ok) {
@@ -154,7 +156,10 @@ export default function VideoImportScreen() {
               if (statusData.status === 'done') {
                 clearInterval(pollInterval);
                 setUploadProgress(100);
-                resolve(statusData.subtitles);
+                resolve({
+                  subtitles: statusData.subtitles,
+                  detectedPosition: statusData.detectedPosition
+                });
               } else if (statusData.status === 'error') {
                 clearInterval(pollInterval);
                 reject(new Error(statusData.error || 'Lỗi nhận dạng tiếng Trung'));
@@ -199,12 +204,28 @@ export default function VideoImportScreen() {
         });
 
         setUploadProgress(0);
-        const subs = await handleTranscribe(data.audioPath);
+        const result = await handleTranscribe(data.audioPath, data.videoPath);
         
-        if (subs) {
+        if (result && result.subtitles) {
+          const { subtitles: subs, detectedPosition } = result;
+          const detectedY = detectedPosition ? detectedPosition.yPercentage : 85;
+          const detectedHeight = detectedPosition ? detectedPosition.heightPercentage : 15;
+
           // Stamp every segment with the chosen default voice so UI and export stay in sync
           setSubtitles(subs.map(s => ({ ...s, voice: s.voice || defaultVoice })));
-          setVideoData(data);
+          
+          setVideoData({
+            ...data,
+            detectedSubtitleY: detectedY,
+            detectedSubtitleHeight: detectedHeight
+          });
+
+          // Align the default subtitleStyle Y offset to overlay or replace the detected Y coordinate
+          setSubtitleStyle({
+            ...subtitleStyle,
+            yPercent: detectedY
+          });
+
           showToast(`Hoàn tất! Đã tạo ${subs.length} phân đoạn thuyết minh.`);
         }
       } catch (error) {
