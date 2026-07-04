@@ -29,6 +29,81 @@ export default function TimelineWorkspace({ videoRef }) {
   const timelineRef = useRef(null);
   const isScrubbingRef = useRef(false);
 
+  const EDGE_SCROLL_THRESHOLD = 50;
+  const EDGE_SCROLL_SPEED = 14;
+
+  const getTracksElement = () => {
+    if (!timelineRef.current) return null;
+    return timelineRef.current.querySelector('.timeline-tracks');
+  };
+
+  /** Map screen X to absolute seconds on the timeline (accounts for horizontal scroll). */
+  const clientXToTimelineSeconds = (clientX) => {
+    const tracks = getTracksElement();
+    if (!tracks) return 0;
+    const rect = tracks.getBoundingClientRect();
+    return (clientX - rect.left) / pixelsPerSecond;
+  };
+
+  /**
+   * Wire document-level mousemove/mouseup with edge auto-scroll while dragging/resizing.
+   * onMove(clientX) is also called each auto-scroll tick so blocks keep updating at screen edges.
+   */
+  const attachTimelineDragListeners = (onMove, onUp) => {
+    let autoScrollInterval = null;
+    let lastClientX = 0;
+
+    const stopAutoScroll = () => {
+      if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+      }
+    };
+
+    const maybeStartEdgeScroll = (clientX) => {
+      lastClientX = clientX;
+      const container = timelineRef.current;
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const distLeft = clientX - containerRect.left;
+      const distRight = containerRect.right - clientX;
+
+      stopAutoScroll();
+
+      const containerWidth = containerRect.width;
+      const relativeX = clientX - containerRect.left;
+
+      if (relativeX < EDGE_SCROLL_THRESHOLD) {
+        autoScrollInterval = setInterval(() => {
+          container.scrollLeft = Math.max(0, container.scrollLeft - EDGE_SCROLL_SPEED);
+          onMove(lastClientX);
+        }, 16);
+      } else if (relativeX > containerWidth - EDGE_SCROLL_THRESHOLD) {
+        autoScrollInterval = setInterval(() => {
+          const maxScroll = container.scrollWidth - container.clientWidth;
+          container.scrollLeft = Math.min(maxScroll, container.scrollLeft + EDGE_SCROLL_SPEED);
+          onMove(lastClientX);
+        }, 16);
+      }
+    };
+
+    const handleMouseMove = (moveEvent) => {
+      maybeStartEdgeScroll(moveEvent.clientX);
+      onMove(moveEvent.clientX);
+    };
+
+    const handleMouseUp = () => {
+      stopAutoScroll();
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      onUp?.();
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
   // Auto-scroll timeline to keep playhead centered during playback
   useEffect(() => {
     if (timelineRef.current && isPlaying) {
@@ -114,172 +189,142 @@ export default function TimelineWorkspace({ videoRef }) {
   const handleTimelineBlockResizeMouseDown = (index, edge, e) => {
     e.stopPropagation();
     e.preventDefault();
-    
-    // Save history snapshot before resize action starts
+
     saveHistory();
-    
-    const startX = e.clientX;
+
     const sub = subtitles[index];
     const originalStart = parseTimeToSeconds(sub.startTime);
     const originalEnd = parseTimeToSeconds(sub.endTime);
-    
-    const handleMouseMove = (moveEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaSeconds = deltaX / pixelsPerSecond;
-      
+
+    const handleMouseMove = (clientX) => {
+      const timeAtMouse = clientXToTimelineSeconds(clientX);
+
       if (edge === 'left') {
-        const newStart = Math.max(0, Math.min(originalEnd - 0.1, originalStart + deltaSeconds));
-        setSubtitles(subtitles.map((item, idx) => 
+        const newStart = Math.max(0, Math.min(originalEnd - 0.1, timeAtMouse));
+        setSubtitles((prev) => prev.map((item, idx) =>
           idx === index ? { ...item, startTime: formatSecondsToCustomTime(newStart) } : item
         ));
       } else {
-        const newEnd = Math.max(originalStart + 0.1, Math.min(videoDuration || 30, originalEnd + deltaSeconds));
-        setSubtitles(subtitles.map((item, idx) => 
+        const newEnd = Math.max(originalStart + 0.1, Math.min(videoDuration || 30, timeAtMouse));
+        setSubtitles((prev) => prev.map((item, idx) =>
           idx === index ? { ...item, endTime: formatSecondsToCustomTime(newEnd) } : item
         ));
       }
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    attachTimelineDragListeners(handleMouseMove, null);
   };
 
   const handleBlurBlockResizeMouseDown = (index, edge, e) => {
     e.stopPropagation();
     e.preventDefault();
-    
-    // Save history snapshot before resize action starts
+
     saveHistory();
-    
-    const startX = e.clientX;
+
     const mask = blurMasks[index];
     const originalStart = parseTimeToSeconds(mask.startTime);
     const originalEnd = parseTimeToSeconds(mask.endTime);
-    
-    const handleMouseMove = (moveEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaSeconds = deltaX / pixelsPerSecond;
-      
+
+    const handleMouseMove = (clientX) => {
+      const timeAtMouse = clientXToTimelineSeconds(clientX);
+
       if (edge === 'left') {
-        const newStart = Math.max(0, Math.min(originalEnd - 0.2, originalStart + deltaSeconds));
-        setBlurMasks(blurMasks.map((item, idx) => 
+        const newStart = Math.max(0, Math.min(originalEnd - 0.2, timeAtMouse));
+        setBlurMasks((prev) => prev.map((item, idx) =>
           idx === index ? { ...item, startTime: formatSecondsToCustomTime(newStart) } : item
         ));
       } else {
-        const newEnd = Math.max(originalStart + 0.2, Math.min(videoDuration || 30, originalEnd + deltaSeconds));
-        setBlurMasks(blurMasks.map((item, idx) => 
+        const newEnd = Math.max(originalStart + 0.2, Math.min(videoDuration || 30, timeAtMouse));
+        setBlurMasks((prev) => prev.map((item, idx) =>
           idx === index ? { ...item, endTime: formatSecondsToCustomTime(newEnd) } : item
         ));
       }
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    attachTimelineDragListeners(handleMouseMove, null);
   };
 
   const handleTimelineBlockDragMouseDown = (index, e) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     saveHistory();
-    
+
     const startX = e.clientX;
     const sub = subtitles[index];
     const originalStart = parseTimeToSeconds(sub.startTime);
     const originalEnd = parseTimeToSeconds(sub.endTime);
     const blockDuration = originalEnd - originalStart;
+    const dragOffsetSec = clientXToTimelineSeconds(e.clientX) - originalStart;
 
     let hasDragged = false;
-    
-    const handleMouseMove = (moveEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      if (Math.abs(deltaX) > 2) {
+
+    const handleMouseMove = (clientX) => {
+      if (Math.abs(clientX - startX) > 2) {
         hasDragged = true;
       }
-      const deltaSeconds = deltaX / pixelsPerSecond;
-      
-      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, originalStart + deltaSeconds));
+
+      const timeAtMouse = clientXToTimelineSeconds(clientX);
+      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, timeAtMouse - dragOffsetSec));
       const newEnd = newStart + blockDuration;
-      
-      setSubtitles(subtitles.map((item, idx) => 
-        idx === index ? { 
-          ...item, 
-          startTime: formatSecondsToCustomTime(newStart), 
-          endTime: formatSecondsToCustomTime(newEnd) 
+
+      setSubtitles((prev) => prev.map((item, idx) =>
+        idx === index ? {
+          ...item,
+          startTime: formatSecondsToCustomTime(newStart),
+          endTime: formatSecondsToCustomTime(newEnd)
         } : item
       ));
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      
+    attachTimelineDragListeners(handleMouseMove, () => {
       if (!hasDragged) {
         setActiveSubtitleIndex(index);
         handleSeek(originalStart);
       }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    });
   };
 
   const handleBlurBlockDragMouseDown = (index, e) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     saveHistory();
-    
+
     const startX = e.clientX;
     const mask = blurMasks[index];
     const originalStart = parseTimeToSeconds(mask.startTime);
     const originalEnd = parseTimeToSeconds(mask.endTime);
     const blockDuration = originalEnd - originalStart;
+    const dragOffsetSec = clientXToTimelineSeconds(e.clientX) - originalStart;
 
     let hasDragged = false;
-    
-    const handleMouseMove = (moveEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      if (Math.abs(deltaX) > 2) {
+
+    const handleMouseMove = (clientX) => {
+      if (Math.abs(clientX - startX) > 2) {
         hasDragged = true;
       }
-      const deltaSeconds = deltaX / pixelsPerSecond;
-      
-      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, originalStart + deltaSeconds));
+
+      const timeAtMouse = clientXToTimelineSeconds(clientX);
+      const newStart = Math.max(0, Math.min((videoDuration || 30) - blockDuration, timeAtMouse - dragOffsetSec));
       const newEnd = newStart + blockDuration;
-      
-      setBlurMasks(blurMasks.map((item, idx) => 
-        idx === index ? { 
-          ...item, 
-          startTime: formatSecondsToCustomTime(newStart), 
-          endTime: formatSecondsToCustomTime(newEnd) 
+
+      setBlurMasks((prev) => prev.map((item, idx) =>
+        idx === index ? {
+          ...item,
+          startTime: formatSecondsToCustomTime(newStart),
+          endTime: formatSecondsToCustomTime(newEnd)
         } : item
       ));
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      
+    attachTimelineDragListeners(handleMouseMove, () => {
       if (!hasDragged) {
         setActiveBlurIndex(index);
         setInspectorTab('mask');
         handleSeek(originalStart);
       }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    });
   };
 
   const handleSeek = (time) => {
