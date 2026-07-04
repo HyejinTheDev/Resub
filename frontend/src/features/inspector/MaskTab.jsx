@@ -51,6 +51,7 @@ export default function MaskTab() {
       opacity: 0.15
     };
     handleAddBlurMask(newBlur);
+  };
 
   const setMaskToFullDuration = () => {
     saveHistory();
