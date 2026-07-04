@@ -8,10 +8,9 @@ const { getFfmpegCommand, getFfprobeCommand } = require('./dubbingEngine');
 const { transcribeAndTranslate } = require('./geminiService');
 
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
-// A small overlap avoids losing phrases that straddle a cut; duplicates are removed on merge.
-const SEGMENT_SEC = 120;
+const SEGMENT_SEC = 60;
 const OVERLAP_SEC = 2;
-const CONCURRENCY = 3;
+const CONCURRENCY = 4;
 
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -74,8 +73,7 @@ function cutAudioSegment(sourcePath, outPath, startSec, lengthSec) {
       '-ss', String(startSec),
       '-t', String(lengthSec),
       '-i', sourcePath,
-      '-acodec', 'libmp3lame',
-      '-q:a', '4',
+      '-acodec', 'copy',
       outPath
     ];
     const proc = spawn(getFfmpegCommand(), args);
