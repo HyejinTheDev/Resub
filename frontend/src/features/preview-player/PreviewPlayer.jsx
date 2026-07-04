@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { usePlaybackStore } from '../../store/usePlaybackStore';
 import { hexToRgba, parseTimeToSeconds, formatTime, formatSecondsToCustomTime } from '../../shared/utils/timeFormatter';
@@ -42,6 +42,8 @@ export default function PreviewPlayer({ videoRef }) {
   const isResizingWidthRef = useRef(false);
   const isDraggingCropRef = useRef(false);
   const isResizingCropRef = useRef(false);
+
+  const [showCenterLine, setShowCenterLine] = useState(false);
 
   // Sync volume with bgVolume
   useEffect(() => {
@@ -264,8 +266,18 @@ export default function PreviewPlayer({ videoRef }) {
       const deltaXPercent = (deltaX / containerWidth) * 100;
       const deltaYPercent = (deltaY / containerHeight) * 100;
       
-      const newX = Math.max(5, Math.min(95, startXPercent + deltaXPercent));
+      let newX = startXPercent + deltaXPercent;
       const newY = Math.max(5, Math.min(95, startYPercent + deltaYPercent));
+
+      // Snapping logic: if close to center (50%), snap and show guide line
+      if (Math.abs(newX - 50) < 2.0) {
+        newX = 50;
+        setShowCenterLine(true);
+      } else {
+        setShowCenterLine(false);
+      }
+      
+      newX = Math.max(5, Math.min(95, newX));
       
       setBlurMasks(blurMasks.map((item, idx) => 
         idx === index ? { ...item, xPercentage: Math.round(newX), yPercentage: Math.round(newY) } : item
@@ -274,6 +286,7 @@ export default function PreviewPlayer({ videoRef }) {
 
     const handleMouseUp = () => {
       isDraggingMaskRef.current = false;
+      setShowCenterLine(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -430,8 +443,18 @@ export default function PreviewPlayer({ videoRef }) {
       const deltaXPercent = (deltaX / containerWidth) * 100;
       const deltaYPercent = (deltaY / containerHeight) * 100;
       
-      const newX = Math.max(5, Math.min(95, startXPercent + deltaXPercent));
+      let newX = startXPercent + deltaXPercent;
       const newY = Math.max(5, Math.min(95, startYPercent + deltaYPercent));
+
+      // Snapping logic: if close to center (50%), snap and show guide line
+      if (Math.abs(newX - 50) < 2.0) {
+        newX = 50;
+        setShowCenterLine(true);
+      } else {
+        setShowCenterLine(false);
+      }
+      
+      newX = Math.max(5, Math.min(95, newX));
       
       setSubtitleStyle({
         ...subtitleStyle,
@@ -442,6 +465,7 @@ export default function PreviewPlayer({ videoRef }) {
 
     const handleMouseUp = () => {
       isDraggingTextRef.current = false;
+      setShowCenterLine(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -550,6 +574,22 @@ export default function PreviewPlayer({ videoRef }) {
   return (
     <section className="center-panel" style={{ width: '100%', height: '100%' }} onClick={handleCenterPanelClick}>
       <div className="video-container" style={{ aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` }}>
+        {showCenterLine && (
+          <div 
+            className="center-guideline"
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: '50%',
+              width: '1px',
+              borderLeft: '1.5px dashed #ff007f', // Magenta snap guide line
+              zIndex: 15,
+              pointerEvents: 'none',
+              transform: 'translateX(-50%)'
+            }}
+          />
+        )}
         <video 
           src={videoData.videoUrl}
           ref={videoRef}
