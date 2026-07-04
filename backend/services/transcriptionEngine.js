@@ -8,9 +8,9 @@ const { getFfmpegCommand, getFfprobeCommand } = require('./dubbingEngine');
 const { transcribeAndTranslate } = require('./geminiService');
 
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
-const SEGMENT_SEC = 60;
+const SEGMENT_SEC = 30;
 const OVERLAP_SEC = 2;
-const CONCURRENCY = 4;
+const CONCURRENCY = 6;
 
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {

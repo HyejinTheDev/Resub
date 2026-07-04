@@ -44,7 +44,7 @@ Follow this exact JSON structure:
 ]
 
 IMPORTANT RULES:
-- CRITICAL: Split subtitle segments into short, readable phrases. The Vietnamese translation ("text") MUST have its word count strictly matching the segment's duration to ensure perfect lip-sync. For a segment of D seconds (duration = endTime - startTime), the Vietnamese translation MUST contain between Math.floor(D * 2.8) and Math.ceil(D * 3.5) words. For example: a 2-second segment MUST have 6 to 7 words; a 1-second segment MUST have 3 to 4 words. Do not let the translation exceed this length.
+- CRITICAL: Split subtitle segments into short, readable phrases. The Vietnamese translation length MUST fit the duration. Aim for about 3 words per second of audio (e.g., a 2-second segment should have about 6 words; a 1-second segment should have about 3 words). Keep translations short, concise, and natural to ensure perfect lip-sync.
 - If a speaker says a long sentence, you MUST split it into multiple consecutive smaller segments with precise start and end times matching the word timings.
 - Timestamps must be in chronological order and must never exceed the length of this audio.
 - Translate idioms and cultural references into natural Vietnamese phrasing.
