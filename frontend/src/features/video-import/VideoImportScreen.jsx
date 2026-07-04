@@ -220,9 +220,10 @@ export default function VideoImportScreen() {
             detectedSubtitleHeight: detectedHeight
           });
 
-          // Align the default subtitleStyle Y offset to overlay or replace the detected Y coordinate
+          // Align the default subtitleStyle Y offset to overlay or replace the detected Y coordinate and reset default font size to 10
           setSubtitleStyle({
             ...subtitleStyle,
+            fontSize: 10,
             yPercent: detectedY
           });
 
