@@ -31,6 +31,16 @@
 
   <title>frontend_flutter</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Force unregister all service workers to bypass aggressive web caching
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
