@@ -2,11 +2,22 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/entities/subtitle.dart';
 import '../../../domain/entities/blur_mask.dart';
 
+import '../../../data/models/project_model.dart';
+
 abstract class WorkspaceEvent extends Equatable {
   const WorkspaceEvent();
 
   @override
   List<Object?> get props => [];
+}
+
+class LoadProjectWorkspaceEvent extends WorkspaceEvent {
+  final ProjectModel project;
+
+  const LoadProjectWorkspaceEvent(this.project);
+
+  @override
+  List<Object?> get props => [project];
 }
 
 class InitializeWorkspaceEvent extends WorkspaceEvent {

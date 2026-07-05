@@ -51,6 +51,36 @@ class BlurMask extends Equatable {
     );
   }
 
+  factory BlurMask.fromJson(Map<String, dynamic> json) {
+    return BlurMask(
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
+      yPercentage: (json['yPercentage'] as num?)?.toDouble() ?? 50.0,
+      heightPercentage: (json['heightPercentage'] as num?)?.toDouble() ?? 100.0,
+      xPercentage: (json['xPercentage'] as num?)?.toDouble() ?? 50.0,
+      widthPercentage: (json['widthPercentage'] as num?)?.toDouble() ?? 80.0,
+      blurRadius: (json['blurRadius'] as num?)?.toDouble() ?? 15.0,
+      color: json['color']?.toString() ?? '#000000',
+      opacity: (json['opacity'] as num?)?.toDouble() ?? 0.15,
+      enabled: json['enabled'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'startTime': startTime,
+      'endTime': endTime,
+      'yPercentage': yPercentage,
+      'heightPercentage': heightPercentage,
+      'xPercentage': xPercentage,
+      'widthPercentage': widthPercentage,
+      'blurRadius': blurRadius,
+      'color': color,
+      'opacity': opacity,
+      'enabled': enabled,
+    };
+  }
+
   @override
   List<Object?> get props => [
         startTime,

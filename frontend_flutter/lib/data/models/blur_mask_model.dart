@@ -29,6 +29,7 @@ class BlurMaskModel extends BlurMask {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'startTime': startTime,

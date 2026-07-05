@@ -119,4 +119,39 @@ class ApiClient {
     );
     return response.data as Map<String, dynamic>;
   }
+
+  /// Login user
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/auth/login',
+      data: {'username': username, 'password': password},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Register user
+  Future<Map<String, dynamic>> register(String username, String password) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/auth/register',
+      data: {'username': username, 'password': password},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Login with Google credential token
+  Future<Map<String, dynamic>> loginWithGoogle(String credential) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/auth/google',
+      data: {'credential': credential},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Get Google Sign In Client ID configuration
+  Future<Map<String, dynamic>> getGoogleConfig() async {
+    final response = await _dio.get(
+      '$_baseUrl/api/auth/google-config',
+    );
+    return response.data as Map<String, dynamic>;
+  }
 }

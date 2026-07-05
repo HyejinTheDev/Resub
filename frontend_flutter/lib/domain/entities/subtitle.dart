@@ -31,6 +31,26 @@ class Subtitle extends Equatable {
     );
   }
 
+  factory Subtitle.fromJson(Map<String, dynamic> json) {
+    return Subtitle(
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
+      chineseText: json['chineseText']?.toString() ?? '',
+      text: json['text']?.toString() ?? '',
+      voice: json['voice']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'startTime': startTime,
+      'endTime': endTime,
+      'chineseText': chineseText,
+      'text': text,
+      'voice': voice,
+    };
+  }
+
   @override
   List<Object?> get props => [startTime, endTime, chineseText, text, voice];
 }

@@ -18,6 +18,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<UpdateSettingsEvent>(_onUpdateSettings);
     on<RequestSeekEvent>(_onRequestSeek);
     on<ClearSeekRequestEvent>(_onClearSeekRequest);
+    on<LoadProjectWorkspaceEvent>(_onLoadProject);
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {
@@ -134,5 +135,29 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
 
   void _onClearSeekRequest(ClearSeekRequestEvent event, Emitter<WorkspaceState> emit) {
     emit(state.copyWith(seekRequestMs: null));
+  }
+
+  void _onLoadProject(LoadProjectWorkspaceEvent event, Emitter<WorkspaceState> emit) {
+    final subs = event.project.subtitles.map((json) => Subtitle.fromJson(json as Map<String, dynamic>)).toList();
+    final masks = event.project.blurMasks.map((json) => BlurMask.fromJson(json as Map<String, dynamic>)).toList();
+    
+    final double fs = (event.project.subtitleStyle['fontSize'] as num?)?.toDouble() ?? 10.0;
+    final double yp = (event.project.subtitleStyle['yPercent'] as num?)?.toDouble() ?? 85.0;
+    final String col = event.project.subtitleStyle['color']?.toString() ?? '#EAB308';
+    final String ocol = event.project.subtitleStyle['outlineColor']?.toString() ?? '#000000';
+
+    emit(WorkspaceState(
+      subtitles: subs,
+      blurMasks: masks,
+      videoData: event.project.videoData,
+      subtitleFontSize: fs,
+      subtitleYPercent: yp,
+      subtitleColor: col,
+      subtitleOutlineColor: ocol,
+      bgVolume: (event.project.videoData['bgVolume'] as num?)?.toDouble() ?? 0.15,
+      ttsVolume: (event.project.videoData['ttsVolume'] as num?)?.toDouble() ?? 1.0,
+      defaultVoice: event.project.videoData['defaultVoice']?.toString() ?? 'vi-VN-HoaiMyNeural',
+      capcutCookie: event.project.videoData['capcutCookie']?.toString() ?? '',
+    ));
   }
 }

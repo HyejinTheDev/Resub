@@ -160,65 +160,58 @@ class _ImportScreenState extends State<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('RESUB — Tự Động Lồng Tiếng AI'),
-      ),
-      body: Center(
-        child: BlocConsumer<ImportBloc, ImportState>(
-          listener: (context, state) {
-            if (state is ImportFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.error),
-                  backgroundColor: AppColors.error,
+    return BlocConsumer<ImportBloc, ImportState>(
+      listener: (context, state) {
+        if (state is ImportFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final bool isDesktop = constraints.maxWidth > 900;
+
+            final Widget splitterCard = _buildSplitterCard(context, state);
+            final Widget importCard = _buildImportCard(context, state);
+
+            if (isDesktop) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: splitterCard),
+                        const SizedBox(width: 24),
+                        Expanded(child: importCard),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            } else {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    splitterCard,
+                    const SizedBox(height: 20),
+                    importCard,
+                  ],
                 ),
               );
             }
           },
-          builder: (context, state) {
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isDesktop = constraints.maxWidth > 900;
-
-                final Widget splitterCard = _buildSplitterCard(context, state);
-                final Widget importCard = _buildImportCard(context, state);
-
-                if (isDesktop) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 1200),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: splitterCard),
-                            const SizedBox(width: 24),
-                            Expanded(child: importCard),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                } else {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        splitterCard,
-                        const SizedBox(height: 20),
-                        importCard,
-                      ],
-                    ),
-                  );
-                }
-              },
-            );
-          },
-        ),
-      ),
+        );
+      },
     );
   }
 
