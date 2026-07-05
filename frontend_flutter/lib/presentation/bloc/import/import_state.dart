@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:equatable/equatable.dart';
 import '../../../domain/entities/subtitle.dart';
 
@@ -12,7 +12,7 @@ abstract class ImportState extends Equatable {
 class ImportInitial extends ImportState {}
 
 class ImportFileSelected extends ImportState {
-  final File file;
+  final XFile file;
   const ImportFileSelected(this.file);
 
   @override
@@ -20,7 +20,7 @@ class ImportFileSelected extends ImportState {
 }
 
 class ImportUploading extends ImportState {
-  final File file;
+  final XFile? file;
   final double progress; // 0.0 to 1.0
 
   const ImportUploading({required this.file, required this.progress});
@@ -30,7 +30,7 @@ class ImportUploading extends ImportState {
 }
 
 class ImportTranscribing extends ImportState {
-  final File file;
+  final XFile? file;
   final int percent;
   final String message;
 

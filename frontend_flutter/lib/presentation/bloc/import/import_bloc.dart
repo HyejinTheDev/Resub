@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/models/subtitle_model.dart';
 import '../../../domain/entities/subtitle.dart';
@@ -9,7 +9,7 @@ import 'import_state.dart';
 
 class ImportBloc extends Bloc<ImportEvent, ImportState> {
   final VideoRepository videoRepository;
-  File? _selectedFile;
+  XFile? _selectedFile;
   Timer? _pollingTimer;
 
   ImportBloc({required this.videoRepository}) : super(ImportInitial()) {
@@ -17,6 +17,7 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
     on<StartUploadAndTranscribeEvent>(_onStartUploadAndTranscribe);
     on<PollProgressEvent>(_onPollProgress);
     on<ResetImportEvent>(_onResetImport);
+    on<LoadSegmentAndTranscribeEvent>(_onLoadSegmentAndTranscribe);
   }
 
   void _onSelectVideo(SelectVideoEvent event, Emitter<ImportState> emit) {
@@ -81,8 +82,8 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
     PollProgressEvent event,
     Emitter<ImportState> emit,
   ) async {
+    // Note: _selectedFile might be null if transcribing a split segment
     final file = _selectedFile;
-    if (file == null) return;
 
     try {
       final progress = await videoRepository.getTranscriptionProgress(event.taskId);
@@ -127,6 +128,51 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
       }
     } catch (e) {
       emit(ImportFailure('Lỗi kiểm tra tiến trình: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onLoadSegmentAndTranscribe(
+    LoadSegmentAndTranscribeEvent event,
+    Emitter<ImportState> emit,
+  ) async {
+    _selectedFile = null; // No local file tracked
+    emit(const ImportTranscribing(
+      file: null,
+      percent: 0,
+      message: 'Đang chuẩn bị phân đoạn video...',
+    ));
+
+    try {
+      // 1. Load split segment to extract audio
+      final result = await videoRepository.loadSplitSegment(event.filePath);
+
+      final String? videoPath = result['videoPath'];
+      final String? audioPath = result['audioPath'];
+
+      if (videoPath == null || audioPath == null) {
+        emit(const ImportFailure('Không thể tải phân đoạn video từ máy chủ.'));
+        return;
+      }
+
+      emit(const ImportTranscribing(
+        file: null,
+        percent: 0,
+        message: 'Đang khởi động dịch video (AI)...',
+      ));
+
+      // 2. Start transcription
+      final taskId = await videoRepository.startTranscription(
+        videoPath: videoPath,
+        audioPath: audioPath,
+        geminiKey: event.geminiKey,
+        useSystemPool: event.useSystemPool,
+      );
+
+      // 3. Trigger polling
+      _pollingTimer?.cancel();
+      add(PollProgressEvent(taskId));
+    } catch (e) {
+      emit(ImportFailure('Lỗi tải phân đoạn: ${e.toString()}'));
     }
   }
 

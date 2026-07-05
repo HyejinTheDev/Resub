@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
 
 class ApiClient {
@@ -20,12 +20,12 @@ class ApiClient {
   }
 
   /// Upload video file to backend
-  Future<Map<String, dynamic>> uploadVideo(File file, {void Function(int, int)? onSendProgress}) async {
-    final String fileName = file.path.split(Platform.pathSeparator).last;
+  Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int, int)? onSendProgress}) async {
+    final bytes = await file.readAsBytes();
     final FormData formData = FormData.fromMap({
-      "video": await MultipartFile.fromFile(
-        file.path,
-        filename: fileName,
+      "video": MultipartFile.fromBytes(
+        bytes,
+        filename: file.name,
       ),
     });
 
@@ -88,6 +88,34 @@ class ApiClient {
     final response = await _dio.post(
       '$_baseUrl/api/dub-cancel',
       data: {'exportId': exportId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Split a long video file into segments
+  Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int, int)? onSendProgress}) async {
+    final bytes = await file.readAsBytes();
+    final FormData formData = FormData.fromMap({
+      "video": MultipartFile.fromBytes(
+        bytes,
+        filename: file.name,
+      ),
+      "segmentMinutes": segmentMinutes,
+    });
+
+    final response = await _dio.post(
+      '$_baseUrl/api/split-video',
+      data: formData,
+      onSendProgress: onSendProgress,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Load a previously split video segment as a new project
+  Future<Map<String, dynamic>> loadSplitSegment(String filePath) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/load-split-segment',
+      data: {'filePath': filePath},
     );
     return response.data as Map<String, dynamic>;
   }

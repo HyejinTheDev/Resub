@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:equatable/equatable.dart';
 
 abstract class ImportEvent extends Equatable {
@@ -9,7 +9,7 @@ abstract class ImportEvent extends Equatable {
 }
 
 class SelectVideoEvent extends ImportEvent {
-  final File file;
+  final XFile file;
   const SelectVideoEvent(this.file);
 
   @override
@@ -38,3 +38,18 @@ class PollProgressEvent extends ImportEvent {
 }
 
 class ResetImportEvent extends ImportEvent {}
+
+class LoadSegmentAndTranscribeEvent extends ImportEvent {
+  final String filePath;
+  final String? geminiKey;
+  final bool useSystemPool;
+
+  const LoadSegmentAndTranscribeEvent({
+    required this.filePath,
+    this.geminiKey,
+    this.useSystemPool = true,
+  });
+
+  @override
+  List<Object?> get props => [filePath, geminiKey, useSystemPool];
+}

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import '../../core/network/api_client.dart';
 import '../../domain/repositories/video_repository.dart';
 
@@ -8,7 +8,7 @@ class VideoRepositoryImpl implements VideoRepository {
   VideoRepositoryImpl({required this.apiClient});
 
   @override
-  Future<Map<String, dynamic>> uploadVideo(File file, {void Function(int sent, int total)? onSendProgress}) async {
+  Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int sent, int total)? onSendProgress}) async {
     return await apiClient.uploadVideo(file, onSendProgress: onSendProgress);
   }
 
@@ -54,5 +54,15 @@ class VideoRepositoryImpl implements VideoRepository {
   @override
   Future<void> cancelDubbing(String exportId) async {
     await apiClient.cancelDubbing(exportId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int sent, int total)? onSendProgress}) async {
+    return await apiClient.splitVideo(file, segmentMinutes, onSendProgress: onSendProgress);
+  }
+
+  @override
+  Future<Map<String, dynamic>> loadSplitSegment(String filePath) async {
+    return await apiClient.loadSplitSegment(filePath);
   }
 }
