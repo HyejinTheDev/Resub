@@ -1,6 +1,7 @@
 import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -64,16 +65,32 @@ class ApiClient {
     String? geminiKey,
     bool useSystemPool = true,
   }) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/transcribe',
-      data: {
-        'videoPath': videoPath,
-        'audioPath': audioPath,
-        'geminiKey': geminiKey ?? '',
-        'useSystemPool': useSystemPool,
-      },
-    );
-    return response.data as Map<String, dynamic>;
+    final String resolvedTaskId = const Uuid().v4();
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/transcribe',
+        data: {
+          'videoPath': videoPath,
+          'audioPath': audioPath,
+          'geminiKey': geminiKey ?? '',
+          'useSystemPool': useSystemPool,
+          'taskId': resolvedTaskId,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] == true || data['taskId'] == null) {
+        data['taskId'] = resolvedTaskId;
+      }
+      return data;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi nhận dạng video: ${e.message}');
+    }
   }
 
   /// Get active transcription task progress
