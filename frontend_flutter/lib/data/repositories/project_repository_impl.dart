@@ -6,10 +6,19 @@ import '../models/project_model.dart';
 class ProjectRepositoryImpl implements ProjectRepository {
   static const String _projectsKey = 'resub_projects';
 
+  // Static in-memory storage fallback for web sandboxed iframes (like Hugging Face Spaces)
+  static final Map<String, String> _memStorage = {};
+
   @override
   Future<List<ProjectModel>> getAllProjects() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_projectsKey);
+    String? jsonStr;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      jsonStr = prefs.getString(_projectsKey);
+    } catch (_) {
+      jsonStr = _memStorage[_projectsKey];
+    }
+
     if (jsonStr == null) return [];
     try {
       final List<dynamic> list = jsonDecode(jsonStr) as List<dynamic>;
@@ -21,7 +30,6 @@ class ProjectRepositoryImpl implements ProjectRepository {
 
   @override
   Future<void> saveProject(ProjectModel project) async {
-    final prefs = await SharedPreferences.getInstance();
     final projects = await getAllProjects();
     
     // Remove if already exists, then insert at the beginning
@@ -29,21 +37,28 @@ class ProjectRepositoryImpl implements ProjectRepository {
     projects.insert(0, project);
     
     final jsonStr = jsonEncode(projects.map((p) => p.toJson()).toList());
-    await prefs.setString(_projectsKey, jsonStr);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_projectsKey, jsonStr);
+    } catch (_) {}
+    _memStorage[_projectsKey] = jsonStr;
   }
 
   @override
   Future<void> deleteProject(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     final projects = await getAllProjects();
     projects.removeWhere((p) => p.id == id);
+    
     final jsonStr = jsonEncode(projects.map((p) => p.toJson()).toList());
-    await prefs.setString(_projectsKey, jsonStr);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_projectsKey, jsonStr);
+    } catch (_) {}
+    _memStorage[_projectsKey] = jsonStr;
   }
 
   @override
   Future<void> renameProject(String id, String newName) async {
-    final prefs = await SharedPreferences.getInstance();
     final projects = await getAllProjects();
     
     final index = projects.indexWhere((p) => p.id == id);
@@ -62,7 +77,11 @@ class ProjectRepositoryImpl implements ProjectRepository {
         videoData: oldProj.videoData,
       );
       final jsonStr = jsonEncode(projects.map((p) => p.toJson()).toList());
-      await prefs.setString(_projectsKey, jsonStr);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_projectsKey, jsonStr);
+      } catch (_) {}
+      _memStorage[_projectsKey] = jsonStr;
     }
   }
 }

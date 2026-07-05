@@ -11,16 +11,26 @@ class AuthRepositoryImpl implements AuthRepository {
 
   static const String _userKey = 'resub_user';
 
+  // Static in-memory storage fallback for web sandboxed iframes (like Hugging Face Spaces)
+  static final Map<String, String> _memStorage = {};
+
   @override
   Future<UserModel?> getCachedUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userStr = prefs.getString(_userKey);
-    if (userStr == null) return null;
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userStr = prefs.getString(_userKey);
+      if (userStr == null) return null;
       final json = jsonDecode(userStr) as Map<String, dynamic>;
       return UserModel.fromJson(json);
     } catch (_) {
-      return null;
+      final userStr = _memStorage[_userKey];
+      if (userStr == null) return null;
+      try {
+        final json = jsonDecode(userStr) as Map<String, dynamic>;
+        return UserModel.fromJson(json);
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -59,8 +69,11 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_userKey);
+    } catch (_) {}
+    _memStorage.remove(_userKey);
   }
 
   @override
@@ -74,7 +87,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<void> _cacheUser(UserModel user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, jsonEncode(user.toJson()));
+    final userStr = jsonEncode(user.toJson());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userKey, userStr);
+    } catch (_) {}
+    _memStorage[_userKey] = userStr;
   }
 }
