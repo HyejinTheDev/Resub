@@ -1,5 +1,6 @@
 import 'package:cross_file/cross_file.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiClient {
   final Dio _dio;
@@ -11,6 +12,15 @@ class ApiClient {
   ApiClient() : _dio = Dio() {
     _dio.options.connectTimeout = const Duration(seconds: 30);
     _dio.options.receiveTimeout = const Duration(minutes: 5);
+
+    if (kIsWeb) {
+      final String origin = Uri.base.origin;
+      if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+        _baseUrl = 'http://localhost:3051';
+      } else {
+        _baseUrl = origin;
+      }
+    }
   }
 
   String get baseUrl => _baseUrl;
