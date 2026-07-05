@@ -31,20 +31,30 @@ class ApiClient {
 
   /// Upload video file to backend
   Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int, int)? onSendProgress}) async {
-    final bytes = await file.readAsBytes();
-    final FormData formData = FormData.fromMap({
-      "video": MultipartFile.fromBytes(
-        bytes,
-        filename: file.name,
-      ),
-    });
+    try {
+      final bytes = await file.readAsBytes();
+      final FormData formData = FormData.fromMap({
+        "video": MultipartFile.fromBytes(
+          bytes,
+          filename: file.name,
+        ),
+      });
 
-    final response = await _dio.post(
-      '$_baseUrl/api/upload',
-      data: formData,
-      onSendProgress: onSendProgress,
-    );
-    return response.data as Map<String, dynamic>;
+      final response = await _dio.post(
+        '$_baseUrl/api/upload',
+        data: formData,
+        onSendProgress: onSendProgress,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi tải video lên máy chủ: ${e.message}');
+    }
   }
 
   /// Start transcription & translation task
@@ -104,30 +114,50 @@ class ApiClient {
 
   /// Split a long video file into segments
   Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int, int)? onSendProgress}) async {
-    final bytes = await file.readAsBytes();
-    final FormData formData = FormData.fromMap({
-      "video": MultipartFile.fromBytes(
-        bytes,
-        filename: file.name,
-      ),
-      "segmentMinutes": segmentMinutes,
-    });
+    try {
+      final bytes = await file.readAsBytes();
+      final FormData formData = FormData.fromMap({
+        "video": MultipartFile.fromBytes(
+          bytes,
+          filename: file.name,
+        ),
+        "segmentMinutes": segmentMinutes,
+      });
 
-    final response = await _dio.post(
-      '$_baseUrl/api/split-video',
-      data: formData,
-      onSendProgress: onSendProgress,
-    );
-    return response.data as Map<String, dynamic>;
+      final response = await _dio.post(
+        '$_baseUrl/api/split-video',
+        data: formData,
+        onSendProgress: onSendProgress,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi cắt nhỏ video: ${e.message}');
+    }
   }
 
   /// Load a previously split video segment as a new project
   Future<Map<String, dynamic>> loadSplitSegment(String filePath) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/load-split-segment',
-      data: {'filePath': filePath},
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/load-split-segment',
+        data: {'filePath': filePath},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi nạp phân đoạn: ${e.message}');
+    }
   }
 
   /// Login user
