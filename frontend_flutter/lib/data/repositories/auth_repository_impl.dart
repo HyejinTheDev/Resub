@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
+import '../../core/utils/web_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../models/user_model.dart';
 
@@ -16,22 +17,35 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserModel?> getCachedUser() async {
+    // 1. Try Window Name (Web Sandbox persistent storage fallback)
+    try {
+      final windowUserStr = WebStorage.getUserData();
+      if (windowUserStr != null && windowUserStr.isNotEmpty) {
+        final json = jsonDecode(windowUserStr) as Map<String, dynamic>;
+        return UserModel.fromJson(json);
+      }
+    } catch (_) {}
+
+    // 2. Try SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
       final userStr = prefs.getString(_userKey);
-      if (userStr == null) return null;
-      final json = jsonDecode(userStr) as Map<String, dynamic>;
-      return UserModel.fromJson(json);
-    } catch (_) {
-      final userStr = _memStorage[_userKey];
-      if (userStr == null) return null;
-      try {
+      if (userStr != null) {
         final json = jsonDecode(userStr) as Map<String, dynamic>;
         return UserModel.fromJson(json);
-      } catch (_) {
-        return null;
       }
-    }
+    } catch (_) {}
+
+    // 3. Try memory storage
+    try {
+      final userStr = _memStorage[_userKey];
+      if (userStr != null) {
+        final json = jsonDecode(userStr) as Map<String, dynamic>;
+        return UserModel.fromJson(json);
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   @override
@@ -70,6 +84,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     try {
+      WebStorage.clearUserData();
+    } catch (_) {}
+    try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_userKey);
     } catch (_) {}
@@ -88,6 +105,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   Future<void> _cacheUser(UserModel user) async {
     final userStr = jsonEncode(user.toJson());
+    try {
+      WebStorage.saveUserData(userStr);
+    } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userKey, userStr);
