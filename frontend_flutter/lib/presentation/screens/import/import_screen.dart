@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../bloc/import/import_bloc.dart';
@@ -45,7 +46,7 @@ class _ImportScreenState extends State<ImportScreen> {
     if (result != null) {
       final platformFile = result.files.single;
       final xFile = XFile(
-        platformFile.path ?? '',
+        kIsWeb ? '' : (platformFile.path ?? ''),
         bytes: platformFile.bytes,
         name: platformFile.name,
         length: platformFile.size,
@@ -65,7 +66,7 @@ class _ImportScreenState extends State<ImportScreen> {
     if (result != null) {
       final platformFile = result.files.single;
       final xFile = XFile(
-        platformFile.path ?? '',
+        kIsWeb ? '' : (platformFile.path ?? ''),
         bytes: platformFile.bytes,
         name: platformFile.name,
         length: platformFile.size,
