@@ -41,6 +41,33 @@ try {
   const flutterBuildOutputDir = path.join(flutterDir, 'build', 'web');
   copyFolderSync(flutterBuildOutputDir, backendPublicDir);
 
+  console.log('\n🔧 Step 4: Overwriting Service Worker to clear aggressive browser cache...');
+  const swPath = path.join(backendPublicDir, 'flutter_service_worker.js');
+  const bypassSWContent = `
+self.addEventListener('install', function(e) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(names) {
+      return Promise.all(
+        names.map(function(name) {
+          return caches.delete(name);
+        })
+      );
+    }).then(function() {
+      return self.clients.claim();
+    })
+  );
+});
+
+self.addEventListener('fetch', function(e) {
+  e.respondWith(fetch(e.request));
+});
+`;
+  fs.writeFileSync(swPath, bypassSWContent.trim());
+
   console.log('\n✅ Build completed successfully! Static files are now ready in backend/public.');
 } catch (error) {
   console.error('\n❌ Build failed:', error.message);
