@@ -31,11 +31,18 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
     final String? videoUrl = state.videoData['videoUrl'];
     
     if (videoUrl != null && videoUrl.isNotEmpty) {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl))
-        ..initialize().then((_) {
-          setState(() {});
-          _controller!.addListener(_onPlayerUpdate);
-        });
+      _controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      // Force mute on startup to satisfy browser sandbox/iframe autoplay block
+      _controller!.setVolume(0.0);
+      _controller!.initialize().then((_) {
+        // Restore background volume once successfully initialized
+        _controller!.setVolume(state.bgVolume);
+        setState(() {});
+        _controller!.addListener(_onPlayerUpdate);
+      }).catchError((error) {
+        debugPrint('VideoPlayer initialization error: $error');
+        setState(() {});
+      });
     }
   }
 
