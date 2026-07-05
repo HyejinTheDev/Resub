@@ -72,35 +72,38 @@ class WorkspaceScreen extends StatelessWidget {
                 final isDesktop = constraints.maxWidth >= 900;
 
                 if (isDesktop) {
-                  // Desktop Layout: 3 Columns (SubtitleList, Player+Timeline, Inspector)
-                  return Row(
+                  // Desktop Layout: 3 Columns (SubtitleList, Player, Inspector) + Full-Width Timeline at bottom (CapCut style)
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Expanded(
-                        flex: 2,
-                        child: SubtitleListPanel(),
-                      ),
-                      const VerticalDivider(width: 1, color: AppColors.border),
+                      // Top Half: 3 Columns
                       Expanded(
-                        flex: 3,
-                        child: Column(
+                        flex: 5,
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: const [
                             Expanded(
-                              flex: 5,
+                              flex: 25,
+                              child: SubtitleListPanel(),
+                            ),
+                            VerticalDivider(width: 1, color: AppColors.border),
+                            Expanded(
+                              flex: 45,
                               child: WorkspaceVideoPlayer(),
                             ),
+                            VerticalDivider(width: 1, color: AppColors.border),
                             Expanded(
-                              flex: 3,
-                              child: WorkspaceTimeline(),
+                              flex: 30,
+                              child: InspectorPanel(),
                             ),
                           ],
                         ),
                       ),
-                      const VerticalDivider(width: 1, color: AppColors.border),
-                      const SizedBox(
-                        width: 320,
-                        child: InspectorPanel(),
+                      const Divider(height: 1, color: AppColors.border),
+                      // Bottom Half: Full-Width Timeline
+                      const Expanded(
+                        flex: 3,
+                        child: WorkspaceTimeline(),
                       ),
                     ],
                   );
