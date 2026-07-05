@@ -132,29 +132,59 @@ class ApiClient {
 
   /// Login user
   Future<Map<String, dynamic>> login(String username, String password) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/auth/login',
-      data: {'username': username, 'password': password},
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/login',
+        data: {'username': username, 'password': password},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Sai tên đăng nhập hoặc mật khẩu!');
+    }
   }
 
   /// Register user
   Future<Map<String, dynamic>> register(String username, String password) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/auth/register',
-      data: {'username': username, 'password': password},
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/register',
+        data: {'username': username, 'password': password},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Tài khoản đã tồn tại!');
+    }
   }
 
   /// Login with Google credential token
   Future<Map<String, dynamic>> loginWithGoogle(String credential) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/auth/google',
-      data: {'credential': credential},
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/google',
+        data: {'credential': credential},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi đăng nhập Google: ${e.message}');
+    }
   }
 
   /// Get Google Sign In Client ID configuration
@@ -171,14 +201,24 @@ class ApiClient {
     required String voice,
     required String capcutCookie,
   }) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/tts-preview',
-      data: {
-        'text': text,
-        'voice': voice,
-        'capcutCookie': capcutCookie,
-      },
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/tts-preview',
+        data: {
+          'text': text,
+          'voice': voice,
+          'capcutCookie': capcutCookie,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi nghe thử: ${e.message}');
+    }
   }
 }
