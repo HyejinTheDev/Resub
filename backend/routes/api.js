@@ -321,7 +321,7 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     res.json({
       success: true,
       videoId,
-      videoUrl: getFullUrl(req, `/downloads/videos/${videoId}.mp4`),
+      videoUrl: getFullUrl(req, `/downloads/videos/${req.file.filename}`),
       audioUrl: getFullUrl(req, `/downloads/audios/${videoId}.mp3`),
       videoPath,
       audioPath

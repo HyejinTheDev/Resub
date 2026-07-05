@@ -10,8 +10,9 @@ function getPublicBaseUrl(req) {
   if (!req) {
     return '';
   }
-  const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
-  const host = req.get('x-forwarded-host') || req.get('host');
+  const host = req.get('x-forwarded-host') || req.get('host') || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('3051');
+  const protocol = isLocal ? (req.protocol || 'http') : 'https';
   return `${protocol}://${host}`;
 }
 
