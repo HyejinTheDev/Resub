@@ -81,8 +81,34 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      final state = context.read<WorkspaceBloc>().state;
+      final String videoUrl = state.videoData['videoUrl'] ?? '';
+      final String? errorMsg = _controller?.value.errorDescription;
+
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Đang tải video...\n$videoUrl',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              if (errorMsg != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Lỗi: $errorMsg',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+              ],
+            ],
+          ),
+        ),
       );
     }
 
