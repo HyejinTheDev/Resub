@@ -1,0 +1,94 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+
+class ApiClient {
+  final Dio _dio;
+  
+  // Default URL pointing to local server.
+  // Can be dynamically changed to Hugging Face space URL in settings.
+  String _baseUrl = 'http://localhost:3051';
+
+  ApiClient() : _dio = Dio() {
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(minutes: 5);
+  }
+
+  String get baseUrl => _baseUrl;
+
+  void updateBaseUrl(String newUrl) {
+    _baseUrl = newUrl;
+  }
+
+  /// Upload video file to backend
+  Future<Map<String, dynamic>> uploadVideo(File file, {void Function(int, int)? onSendProgress}) async {
+    final String fileName = file.path.split(Platform.pathSeparator).last;
+    final FormData formData = FormData.fromMap({
+      "video": await MultipartFile.fromFile(
+        file.path,
+        filename: fileName,
+      ),
+    });
+
+    final response = await _dio.post(
+      '$_baseUrl/api/upload',
+      data: formData,
+      onSendProgress: onSendProgress,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Start transcription & translation task
+  Future<Map<String, dynamic>> transcribeVideo({
+    required String videoPath,
+    required String audioPath,
+    String? geminiKey,
+    bool useSystemPool = true,
+  }) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/transcribe',
+      data: {
+        'videoPath': videoPath,
+        'audioPath': audioPath,
+        'geminiKey': geminiKey ?? '',
+        'useSystemPool': useSystemPool,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Get active transcription task progress
+  Future<Map<String, dynamic>> getTranscribeStatus(String taskId) async {
+    final response = await _dio.get(
+      '$_baseUrl/api/transcribe-status',
+      queryParameters: {'taskId': taskId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Trigger video export & dubbing complex pass
+  Future<Map<String, dynamic>> startDubbing(Map<String, dynamic> payload) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/dub',
+      data: payload,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Poll video export status
+  Future<Map<String, dynamic>> getDubStatus(String exportId) async {
+    final response = await _dio.get(
+      '$_baseUrl/api/dub-status',
+      queryParameters: {'exportId': exportId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Cancel background video export task
+  Future<Map<String, dynamic>> cancelDubbing(String exportId) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/dub-cancel',
+      data: {'exportId': exportId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+}

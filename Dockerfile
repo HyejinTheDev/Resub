@@ -7,15 +7,11 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 
-RUN npm ci
+RUN npm ci --omit=dev
 
-COPY frontend ./frontend
 COPY backend ./backend
-
-RUN npm run build
 
 # Create downloads directories and assign permissions to user 1000 (node) for Hugging Face compatibility
 RUN mkdir -p /app/backend/downloads/videos \

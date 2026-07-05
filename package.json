@@ -3,14 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "frontend",
     "backend"
   ],
   "scripts": {
-    "dev": "concurrently --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan,green\" \"npm run dev --workspace=frontend\" \"npm run start --workspace=backend\"",
-    "build": "npm run build --workspace=frontend",
-    "start": "node backend/server.js",
-    "install:all": "npm install"
+    "dev": "node backend/server.js",
+    "build": "node scripts/build_web.js",
+    "start": "node backend/server.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

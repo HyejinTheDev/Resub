@@ -52,8 +52,8 @@ app.use('/downloads', express.static(DOWNLOADS_DIR));
 // Register API Router
 app.use('/api', apiRouter);
 
-// Serve React frontend static files in production (monolith deploy)
-const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+// Serve static frontend files in production (monolith deploy)
+const frontendDistPath = path.join(__dirname, 'public');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
   app.get('*', (req, res) => {
