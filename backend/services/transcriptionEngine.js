@@ -218,18 +218,18 @@ async function transcribeSegmented(audioPath, handlers = {}) {
       await cutAudioSegment(audioPath, seg.path, seg.startSec, seg.lengthSec);
     }
 
-    // Shared key reused across segments; rotated only when a segment errors out
-    const keyState = { key: await acquireKey() };
-
     let completed = 0;
     const results = new Array(segments.length);
     let nextIdx = 0;
 
     const worker = async () => {
+      // Each concurrent worker acquires its own independent key from KeyManager
+      const workerKeyState = { key: await acquireKey() };
+      
       while (nextIdx < segments.length) {
         const myIdx = nextIdx++;
         const seg = segments[myIdx];
-        results[myIdx] = await processSegment(seg, keyState, reportBadKey, acquireKey);
+        results[myIdx] = await processSegment(seg, workerKeyState, reportBadKey, acquireKey);
         completed++;
         // Segment work spans 10% -> 95% of the progress bar
         onProgress({
