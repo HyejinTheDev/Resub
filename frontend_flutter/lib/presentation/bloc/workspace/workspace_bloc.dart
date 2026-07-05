@@ -19,6 +19,9 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<RequestSeekEvent>(_onRequestSeek);
     on<ClearSeekRequestEvent>(_onClearSeekRequest);
     on<LoadProjectWorkspaceEvent>(_onLoadProject);
+    on<AddSubtitleEvent>(_onAddSubtitle);
+    on<DeleteSubtitleEvent>(_onDeleteSubtitle);
+    on<BulkVoiceChangeEvent>(_onBulkVoiceChange);
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {
@@ -159,5 +162,57 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       defaultVoice: event.project.videoData['defaultVoice']?.toString() ?? 'vi-VN-HoaiMyNeural',
       capcutCookie: event.project.videoData['capcutCookie']?.toString() ?? '',
     ));
+  }
+
+  int _parseTimeToMs(String timeStr) {
+    final match = RegExp(r'(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?').firstMatch(timeStr);
+    if (match == null) return 0;
+    final m = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final s = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final ms = int.tryParse(match.group(3) ?? '0') ?? 0;
+    return m * 60 * 1000 + s * 1000 + ms;
+  }
+
+  String _formatSecondsToTimeCode(double seconds) {
+    final int m = (seconds / 60).floor();
+    final int s = (seconds % 60).floor();
+    final int ms = ((seconds % 1.0) * 1000).round();
+    return '${m.toString().padLeft(2, '0')}m${s.toString().padLeft(2, '0')}s${ms.toString().padLeft(3, '0')}ms';
+  }
+
+  void _onAddSubtitle(AddSubtitleEvent event, Emitter<WorkspaceState> emit) {
+    final String start = _formatSecondsToTimeCode(event.currentTimeSecs);
+    final String end = _formatSecondsToTimeCode(event.currentTimeSecs + 3.0);
+    final newSub = Subtitle(
+      startTime: start,
+      endTime: end,
+      chineseText: '',
+      text: 'Lời thoại mới',
+      voice: event.defaultVoice,
+    );
+    final updated = List<Subtitle>.from(state.subtitles)..add(newSub);
+    updated.sort((a, b) {
+      final aMs = _parseTimeToMs(a.startTime);
+      final bMs = _parseTimeToMs(b.startTime);
+      return aMs.compareTo(bMs);
+    });
+    emit(state.copyWith(
+      subtitles: updated,
+      selectedSubtitleIndex: updated.indexOf(newSub),
+    ));
+  }
+
+  void _onDeleteSubtitle(DeleteSubtitleEvent event, Emitter<WorkspaceState> emit) {
+    if (event.index < 0 || event.index >= state.subtitles.length) return;
+    final updated = List<Subtitle>.from(state.subtitles)..removeAt(event.index);
+    emit(state.copyWith(
+      subtitles: updated,
+      selectedSubtitleIndex: -1,
+    ));
+  }
+
+  void _onBulkVoiceChange(BulkVoiceChangeEvent event, Emitter<WorkspaceState> emit) {
+    final updated = state.subtitles.map((sub) => sub.copyWith(voice: event.voice)).toList();
+    emit(state.copyWith(subtitles: updated));
   }
 }

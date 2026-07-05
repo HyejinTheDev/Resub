@@ -65,4 +65,13 @@ class VideoRepositoryImpl implements VideoRepository {
   Future<Map<String, dynamic>> loadSplitSegment(String filePath) async {
     return await apiClient.loadSplitSegment(filePath);
   }
+
+  @override
+  Future<String> ttsPreview({required String text, required String voice, required String capcutCookie}) async {
+    final result = await apiClient.ttsPreview(text: text, voice: voice, capcutCookie: capcutCookie);
+    if (result['audioUrl'] != null) {
+      return result['audioUrl'].toString();
+    }
+    throw Exception(result['error'] ?? 'Không thể tạo âm thanh nghe thử');
+  }
 }

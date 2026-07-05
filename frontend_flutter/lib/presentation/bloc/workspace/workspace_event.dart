@@ -60,6 +60,34 @@ class SelectSubtitleEvent extends WorkspaceEvent {
   List<Object?> get props => [index];
 }
 
+class AddSubtitleEvent extends WorkspaceEvent {
+  final double currentTimeSecs;
+  final String defaultVoice;
+
+  const AddSubtitleEvent({required this.currentTimeSecs, required this.defaultVoice});
+
+  @override
+  List<Object?> get props => [currentTimeSecs, defaultVoice];
+}
+
+class DeleteSubtitleEvent extends WorkspaceEvent {
+  final int index;
+
+  const DeleteSubtitleEvent(this.index);
+
+  @override
+  List<Object?> get props => [index];
+}
+
+class BulkVoiceChangeEvent extends WorkspaceEvent {
+  final String voice;
+
+  const BulkVoiceChangeEvent(this.voice);
+
+  @override
+  List<Object?> get props => [voice];
+}
+
 class UpdateSubtitleTextEvent extends WorkspaceEvent {
   final int index;
   final String text;

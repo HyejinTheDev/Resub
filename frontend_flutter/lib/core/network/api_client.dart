@@ -154,4 +154,21 @@ class ApiClient {
     );
     return response.data as Map<String, dynamic>;
   }
+
+  /// Generate TTS preview audio URL
+  Future<Map<String, dynamic>> ttsPreview({
+    required String text,
+    required String voice,
+    required String capcutCookie,
+  }) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/tts-preview',
+      data: {
+        'text': text,
+        'voice': voice,
+        'capcutCookie': capcutCookie,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
 }

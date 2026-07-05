@@ -34,4 +34,7 @@ abstract class VideoRepository {
 
   /// Load a previously split video segment as a new project.
   Future<Map<String, dynamic>> loadSplitSegment(String filePath);
+
+  /// Generate TTS preview audio URL.
+  Future<String> ttsPreview({required String text, required String voice, required String capcutCookie});
 }

@@ -138,22 +138,107 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                     ),
 
                   // 3. Blur masks simulation (cheats with semi-transparent card)
-                  ...state.blurMasks.map((mask) {
+                  ...state.blurMasks.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final mask = entry.value;
                     final start = _parseTimeToMs(mask.startTime);
                     final end = _parseTimeToMs(mask.endTime);
                     final isVisible = state.currentTimeMs >= start && state.currentTimeMs <= end;
 
                     if (!isVisible || !mask.enabled) return const SizedBox.shrink();
 
+                    final bool isSelected = state.selectedMaskIndex == idx;
+
+                    // Calculate positioning coordinates
+                    final double left = constraints.maxWidth * (mask.xPercentage - mask.widthPercentage / 2) / 100;
+                    final double top = constraints.maxHeight * (mask.yPercentage - mask.heightPercentage / 2) / 100;
+                    final double width = constraints.maxWidth * mask.widthPercentage / 100;
+                    final double height = constraints.maxHeight * mask.heightPercentage / 100;
+
+                    final Widget maskWidget = Container(
+                      decoration: BoxDecoration(
+                        color: _colorFromHex(mask.color).withValues(alpha: mask.opacity),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
+                          width: isSelected ? 2.0 : 1.0,
+                        ),
+                      ),
+                    );
+
+                    if (!isSelected) {
+                      return Positioned(
+                        left: left,
+                        top: top,
+                        width: width,
+                        height: height,
+                        child: GestureDetector(
+                          onTap: () {
+                            context.read<WorkspaceBloc>().add(SelectBlurMaskEvent(idx));
+                          },
+                          child: maskWidget,
+                        ),
+                      );
+                    }
+
+                    // Selected Mask: Allows dragging to move and resize handle
                     return Positioned(
-                      top: constraints.maxHeight * (mask.yPercentage - mask.heightPercentage / 2) / 100,
-                      left: constraints.maxWidth * (mask.xPercentage - mask.widthPercentage / 2) / 100,
-                      width: constraints.maxWidth * mask.widthPercentage / 100,
-                      height: constraints.maxHeight * mask.heightPercentage / 100,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _colorFromHex(mask.color).withValues(alpha: mask.opacity),
-                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1),
+                      left: left,
+                      top: top,
+                      width: width,
+                      height: height,
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Move drag detector
+                            Positioned.fill(
+                              child: GestureDetector(
+                                onPanUpdate: (details) {
+                                  final deltaXPercent = (details.delta.dx / constraints.maxWidth) * 100;
+                                  final deltaYPercent = (details.delta.dy / constraints.maxHeight) * 100;
+                                  final newX = (mask.xPercentage + deltaXPercent).clamp(0.0, 100.0);
+                                  final newY = (mask.yPercentage + deltaYPercent).clamp(0.0, 100.0);
+                                  context.read<WorkspaceBloc>().add(
+                                        UpdateBlurMaskEvent(
+                                          index: idx,
+                                          mask: mask.copyWith(xPercentage: newX, yPercentage: newY),
+                                        ),
+                                      );
+                                },
+                                child: maskWidget,
+                              ),
+                            ),
+                            // Resize corner handle (bottom-right)
+                            Positioned(
+                              right: -8,
+                              bottom: -8,
+                              child: GestureDetector(
+                                onPanUpdate: (details) {
+                                  final deltaWidthPercent = (details.delta.dx / constraints.maxWidth) * 100 * 2;
+                                  final deltaHeightPercent = (details.delta.dy / constraints.maxHeight) * 100 * 2;
+                                  final newW = (mask.widthPercentage + deltaWidthPercent).clamp(5.0, 100.0);
+                                  final newH = (mask.heightPercentage + deltaHeightPercent).clamp(2.0, 100.0);
+                                  context.read<WorkspaceBloc>().add(
+                                        UpdateBlurMaskEvent(
+                                          index: idx,
+                                          mask: mask.copyWith(widthPercentage: newW, heightPercentage: newH),
+                                        ),
+                                      );
+                                },
+                                child: Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.zoom_out_map, size: 10, color: Colors.black),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );

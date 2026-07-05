@@ -8,10 +8,11 @@ import '../../bloc/project/project_event.dart';
 import '../../bloc/workspace/workspace_bloc.dart';
 import '../../bloc/workspace/workspace_state.dart';
 
-// Placeholder widgets that we will build in the next steps
+// Import workspace subcomponents
 import 'player/workspace_video_player.dart';
 import 'timeline/workspace_timeline.dart';
 import 'inspector/inspector_panel.dart';
+import 'subtitles/subtitle_list_panel.dart';
 
 class WorkspaceScreen extends StatelessWidget {
   const WorkspaceScreen({super.key});
@@ -68,13 +69,18 @@ class WorkspaceScreen extends StatelessWidget {
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth >= 800;
+                final isDesktop = constraints.maxWidth >= 900;
 
                 if (isDesktop) {
-                  // Desktop Layout: Player + Timeline on the left, Inspector on the right
+                  // Desktop Layout: 3 Columns (SubtitleList, Player+Timeline, Inspector)
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const Expanded(
+                        flex: 2,
+                        child: SubtitleListPanel(),
+                      ),
+                      const VerticalDivider(width: 1, color: AppColors.border),
                       Expanded(
                         flex: 3,
                         child: Column(
@@ -99,22 +105,38 @@ class WorkspaceScreen extends StatelessWidget {
                     ],
                   );
                 } else {
-                  // Mobile Layout: Column stack
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: const [
-                      SizedBox(
-                        height: 240,
-                        child: WorkspaceVideoPlayer(),
-                      ),
-                      Expanded(
-                        child: InspectorPanel(),
-                      ),
-                      SizedBox(
-                        height: 120,
-                        child: WorkspaceTimeline(),
-                      ),
-                    ],
+                  // Mobile Layout: Column stack with tab views for sub lists & inspector tabs
+                  return DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: const [
+                        SizedBox(
+                          height: 240,
+                          child: WorkspaceVideoPlayer(),
+                        ),
+                        TabBar(
+                          indicatorColor: AppColors.primary,
+                          labelColor: AppColors.primary,
+                          tabs: [
+                            Tab(text: 'Phụ đề'),
+                            Tab(text: 'Cấu hình & Xuất'),
+                          ],
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              SubtitleListPanel(),
+                              InspectorPanel(),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 120,
+                          child: WorkspaceTimeline(),
+                        ),
+                      ],
+                    ),
                   );
                 }
               },
