@@ -108,6 +108,7 @@ class _AudioTabState extends State<AudioTab> {
 
               DropdownButtonFormField<String>(
                 initialValue: state.defaultVoice,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Giọng đọc mặc định',
                 ),
@@ -115,7 +116,10 @@ class _AudioTabState extends State<AudioTab> {
                 items: _voices.map((voice) {
                   return DropdownMenuItem<String>(
                     value: voice['value'],
-                    child: Text(voice['label']!),
+                    child: Text(
+                      voice['label']!,
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   );
                 }).toList(),
                 onChanged: (val) {

@@ -596,7 +596,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
   const isBoxPreset = s.textColorPreset && s.textColorPreset.includes('-bg');
   const borderStyle = isBoxPreset ? 3 : 1;
   const outlineColour = isBoxPreset ? '&H80000000' : hexToAssColor(s.outlineColor || '#000000');
-  const outline = isBoxPreset ? 2 : (s.outlineWidth !== undefined ? s.outlineWidth : 2);
+  const outline = isBoxPreset ? 2 : (s.outlineWidth !== undefined ? s.outlineWidth : 3.5);
   const bold = s.bold ? -1 : 0;
   const italic = s.italic ? -1 : 0;
 
@@ -618,7 +618,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},0,5,${marginH},${marginH},0,1`,
+    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},2.5,5,${marginH},${marginH},0,1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'

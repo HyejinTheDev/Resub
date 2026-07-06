@@ -333,7 +333,7 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
                             DropdownButtonFormField<String>(
                               initialValue: sub.voice,
                               isDense: true,
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(fontSize: 11, color: Colors.white),
                               decoration: const InputDecoration(
                                 labelText: 'Giọng đọc riêng phân đoạn',
                                 contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -342,12 +342,12 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
                               items: [
                                 const DropdownMenuItem<String>(
                                   value: null,
-                                  child: Text('Mặc định hệ thống', style: TextStyle(fontStyle: FontStyle.italic)),
+                                  child: Text('Mặc định hệ thống', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.white)),
                                 ),
                                 ..._voices.map((voice) {
                                   return DropdownMenuItem<String>(
                                     value: voice['value'],
-                                    child: Text(voice['label']!),
+                                    child: Text(voice['label']!, style: const TextStyle(color: Colors.white)),
                                   );
                                 }),
                               ],

@@ -314,26 +314,38 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                           );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.black.withValues(alpha: 0.75), // Higher contrast background
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
-                            activeSub.text,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _colorFromHex(state.subtitleColor),
-                              fontSize: state.subtitleFontSize + 6,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 2.0,
-                                  color: _colorFromHex(state.subtitleOutlineColor),
-                                  offset: const Offset(1, 1),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Thick border stroke behind the text
+                              Text(
+                                activeSub.text,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: state.subtitleFontSize + 12, // Increased font size
+                                  fontWeight: FontWeight.bold,
+                                  foreground: Paint()
+                                    ..style = PaintingStyle.stroke
+                                    ..strokeWidth = 5.0
+                                    ..color = _colorFromHex(state.subtitleOutlineColor),
                                 ),
-                              ],
-                            ),
+                              ),
+                              // Solid foreground text
+                              Text(
+                                activeSub.text,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _colorFromHex(state.subtitleColor),
+                                  fontSize: state.subtitleFontSize + 12, // Increased font size
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

@@ -205,14 +205,15 @@ class _ExportTabState extends State<ExportTab> {
               // Quality preset dropdown
               DropdownButtonFormField<String>(
                 initialValue: _quality,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Chất lượng nén video',
                 ),
                 dropdownColor: AppColors.surface,
                 items: const [
-                  DropdownMenuItem(value: 'low', child: Text('Thấp (Nhanh nhất - ultrafast)')),
-                  DropdownMenuItem(value: 'medium', child: Text('Trung bình (Cân bằng - superfast)')),
-                  DropdownMenuItem(value: 'high', child: Text('Cao (Tốt nhất - medium)')),
+                  DropdownMenuItem(value: 'low', child: Text('Thấp (Nhanh nhất - ultrafast)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 'medium', child: Text('Trung bình (Cân bằng - superfast)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 'high', child: Text('Cao (Tốt nhất - medium)', style: TextStyle(color: Colors.white))),
                 ],
                 onChanged: _isExporting
                     ? null
@@ -229,14 +230,15 @@ class _ExportTabState extends State<ExportTab> {
               // Resolution dropdown
               DropdownButtonFormField<String>(
                 initialValue: _resolution,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Độ phân giải video',
                 ),
                 dropdownColor: AppColors.surface,
                 items: const [
-                  DropdownMenuItem(value: '1080', child: Text('FullHD 1080p')),
-                  DropdownMenuItem(value: '720', child: Text('HD 720p')),
-                  DropdownMenuItem(value: '480', child: Text('SD 480p')),
+                  DropdownMenuItem(value: '1080', child: Text('FullHD 1080p', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: '720', child: Text('HD 720p', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: '480', child: Text('SD 480p', style: TextStyle(color: Colors.white))),
                 ],
                 onChanged: _isExporting
                     ? null
