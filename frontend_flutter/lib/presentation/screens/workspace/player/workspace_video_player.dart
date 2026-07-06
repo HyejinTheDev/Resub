@@ -329,11 +329,8 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                             UpdateSubtitleStyleEvent(yPercent: _dragYPercent),
                           );
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
@@ -341,6 +338,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                               Text(
                                 activeSub.text,
                                 textAlign: TextAlign.center,
+                                maxLines: 1,
                                 style: TextStyle(
                                   fontSize: state.subtitleFontSize + 12, // Increased font size
                                   fontWeight: FontWeight.bold,
@@ -354,6 +352,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                               Text(
                                 activeSub.text,
                                 textAlign: TextAlign.center,
+                                maxLines: 1,
                                 style: TextStyle(
                                   color: _colorFromHex(state.subtitleColor),
                                   fontSize: state.subtitleFontSize + 12, // Increased font size
