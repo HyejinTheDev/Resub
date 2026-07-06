@@ -331,9 +331,8 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.75), // Higher contrast background
-                            borderRadius: BorderRadius.circular(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.transparent,
                           ),
                           child: Stack(
                             alignment: Alignment.center,
