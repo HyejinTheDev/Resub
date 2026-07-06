@@ -460,12 +460,21 @@ router.post('/transcribe', async (req, res) => {
           }
         }
 
+        const videoFilename = videoPath ? path.basename(videoPath) : '';
+        const audioFilename = audioPath ? path.basename(audioPath) : '';
+        const videoUrl = videoFilename ? getFullUrl(req, `/downloads/videos/${videoFilename}`) : '';
+        const audioUrl = audioFilename ? getFullUrl(req, `/downloads/audios/${audioFilename}`) : '';
+
         console.log(`[api/transcribe] Task ${taskId} generated ${subtitles.length} merged segments`);
         global.transcribeProgress[taskId] = {
           status: 'done',
           percent: 100,
           subtitles,
-          detectedPosition
+          detectedPosition,
+          videoPath,
+          audioPath,
+          videoUrl,
+          audioUrl
         };
       } catch (error) {
         console.error(`[api/transcribe] Task ${taskId} failed:`, error.message);
