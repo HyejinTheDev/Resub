@@ -158,7 +158,7 @@ class _AudioTabState extends State<AudioTab> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Lưu ý: Giọng đọc CapCut có cảm xúc tự nhiên hơn nhưng yêu cầu nhập Cookie tài khoản web CapCut của bạn mới có thể tạo được giọng.',
+                '💡 Đã cấu hình cookie mặc định sẵn trên hệ thống. Bạn không cần phải nhập trừ khi muốn sử dụng tài khoản CapCut riêng khác.',
                 style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
               ),
             ],
