@@ -42,8 +42,8 @@ class MaskTab extends StatelessWidget {
                         xPercentage: 50.0,
                         widthPercentage: 80.0,
                         blurRadius: 15.0,
-                        color: '#000000',
-                        opacity: 0.15,
+                        color: '#FFFFFF', // Default to white cover
+                        opacity: 0.9,     // Default to 90% opacity to block subtitle behind
                       );
                       context.read<WorkspaceBloc>().add(AddBlurMaskEvent(newMask));
                     },
@@ -146,6 +146,40 @@ class MaskTab extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 12),
+
+                        const Text('Màu sắc vùng che', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildColorButton(
+                              context,
+                              label: 'Trắng',
+                              colorHex: '#FFFFFF',
+                              activeColor: activeMask.color,
+                              index: index,
+                              mask: activeMask,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildColorButton(
+                              context,
+                              label: 'Đen',
+                              colorHex: '#000000',
+                              activeColor: activeMask.color,
+                              index: index,
+                              mask: activeMask,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildColorButton(
+                              context,
+                              label: 'Xám',
+                              colorHex: '#808080',
+                              activeColor: activeMask.color,
+                              index: index,
+                              mask: activeMask,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
 
                         // Width slider
                         _buildSliderRow(
@@ -294,6 +328,33 @@ class MaskTab extends StatelessWidget {
         ),
         const SizedBox(height: 6),
       ],
+    );
+  }
+
+  Widget _buildColorButton(
+    BuildContext context, {
+    required String label,
+    required String colorHex,
+    required String activeColor,
+    required int index,
+    required BlurMask mask,
+  }) {
+    final bool isSelected = activeColor.toLowerCase() == colorHex.toLowerCase();
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: AppColors.primary.withValues(alpha: 0.3),
+      checkmarkColor: AppColors.primary,
+      onSelected: (selected) {
+        if (selected) {
+          context.read<WorkspaceBloc>().add(
+                UpdateBlurMaskEvent(
+                  index: index,
+                  mask: mask.copyWith(color: colorHex),
+                ),
+              );
+        }
+      },
     );
   }
 }

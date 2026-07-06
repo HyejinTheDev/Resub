@@ -190,24 +190,10 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
 
                     final Widget maskWidget = Container(
                       decoration: BoxDecoration(
+                        color: _colorFromHex(mask.color).withValues(alpha: mask.opacity),
                         border: Border.all(
                           color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
                           width: isSelected ? 2.0 : 1.0,
-                        ),
-                      ),
-                      child: ClipRect(
-                        child: GridView.builder(
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 20, // 20 mosaic blocks horizontally
-                            crossAxisSpacing: 1.0,
-                            mainAxisSpacing: 1.0,
-                          ),
-                          itemBuilder: (context, index) {
-                            return Container(
-                              color: _colorFromHex(mask.color).withValues(alpha: mask.opacity * 1.8),
-                            );
-                          },
                         ),
                       ),
                     );
