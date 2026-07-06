@@ -170,18 +170,6 @@ class _ImportScreenState extends State<ImportScreen> {
               backgroundColor: AppColors.error,
             ),
           );
-        } else if (state is ImportSuccess) {
-          context.read<WorkspaceBloc>().add(InitializeWorkspaceEvent(
-                subtitles: state.subtitles,
-                detectedY: state.detectedY,
-                detectedHeight: state.detectedHeight,
-                videoData: state.videoData,
-              ));
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => const WorkspaceScreen(),
-            ),
-          );
         }
       },
       builder: (context, state) {

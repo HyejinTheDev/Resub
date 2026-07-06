@@ -17,6 +17,7 @@ import 'presentation/bloc/auth/auth_event.dart';
 import 'presentation/bloc/auth/auth_state.dart';
 import 'presentation/bloc/project/project_bloc.dart';
 import 'presentation/screens/auth/auth_screen.dart';
+import 'presentation/screens/dashboard/project_dashboard_screen.dart';
 import 'presentation/screens/workspace/workspace_screen.dart';
 
 void main() {
@@ -85,7 +86,7 @@ class MyApp extends StatelessWidget {
             '/': (context) => BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, state) {
                     if (state is Authenticated) {
-                      return const WorkspaceScreen();
+                      return const ProjectDashboardScreen();
                     } else if (state is AuthLoading) {
                       return const Scaffold(
                         body: Center(
