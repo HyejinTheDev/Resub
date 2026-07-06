@@ -87,9 +87,35 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.read<WorkspaceBloc>().state;
+    final String videoUrl = state.videoData['videoUrl'] ?? '';
+
+    if (videoUrl.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.cloud_upload_outlined, size: 64, color: AppColors.textMuted),
+              const SizedBox(height: 16),
+              const Text(
+                'Chưa có video được tải vào phòng',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Vui lòng nhấp vào tab "Nhập" ở góc phải bên trên\nđể tải lên và dịch tự động video của bạn.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_controller == null || !_controller!.value.isInitialized) {
-      final state = context.read<WorkspaceBloc>().state;
-      final String videoUrl = state.videoData['videoUrl'] ?? '';
       final String? errorMsg = _controller?.value.errorDescription;
 
       return Center(
@@ -121,10 +147,21 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
 
     return BlocListener<WorkspaceBloc, WorkspaceState>(
       listenWhen: (previous, current) =>
-          current.seekRequestMs != null &&
-          current.seekRequestMs != previous.seekRequestMs,
+          (current.seekRequestMs != null && current.seekRequestMs != previous.seekRequestMs) ||
+          (current.videoData['videoUrl'] != previous.videoData['videoUrl']),
       listener: (context, state) {
-        if (state.seekRequestMs != null) {
+        final String? newUrl = state.videoData['videoUrl'];
+        if (newUrl != null && newUrl.isNotEmpty) {
+          final String? currentUrl = _controller?.dataSource;
+          if (currentUrl == null || !currentUrl.contains(newUrl)) {
+            _controller?.removeListener(_onPlayerUpdate);
+            _controller?.dispose();
+            _controller = null;
+            _initializeController();
+          }
+        }
+
+        if (state.seekRequestMs != null && _controller != null && _controller!.value.isInitialized) {
           _controller!.seekTo(Duration(milliseconds: state.seekRequestMs!));
           context.read<WorkspaceBloc>().add(ClearSeekRequestEvent());
         }

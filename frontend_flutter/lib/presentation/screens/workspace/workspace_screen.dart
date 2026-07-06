@@ -58,14 +58,8 @@ class WorkspaceScreen extends StatelessWidget {
         builder: (context, state) {
           return Scaffold(
             appBar: AppBar(
-              title: const Text('Phòng Làm Việc — Biên Tập Video'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  // Go back to dashboard screen
-                  Navigator.of(context).pushReplacementNamed('/');
-                },
-              ),
+              title: const Text('RESUB — Biên Tập & Lồng Tiếng Video'),
+              leading: const Icon(Icons.movie_filter, color: AppColors.primary),
             ),
             body: LayoutBuilder(
               builder: (context, constraints) {
