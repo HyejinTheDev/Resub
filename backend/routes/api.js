@@ -79,22 +79,11 @@ router.post('/auth/login', (req, res) => {
   }
 
   const users = readUsers();
-  let user = users.find(
-    u => u.username.toLowerCase() === username.toLowerCase()
+  const user = users.find(
+    u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
   );
 
   if (!user) {
-    // Auto-register since this is a private deployment and database was wiped on container restart
-    user = {
-      id: uuidv4(),
-      username,
-      password,
-      createdAt: new Date().toISOString()
-    };
-    users.push(user);
-    writeUsers(users);
-    console.log(`[Auth] Auto-registered wiped user on login: ${username}`);
-  } else if (user.password !== password) {
     return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
   }
 
