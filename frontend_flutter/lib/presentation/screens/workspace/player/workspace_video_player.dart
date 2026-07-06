@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
@@ -188,12 +189,20 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                     final double width = constraints.maxWidth * mask.widthPercentage / 100;
                     final double height = constraints.maxHeight * mask.heightPercentage / 100;
 
-                    final Widget maskWidget = Container(
-                      decoration: BoxDecoration(
-                        color: _colorFromHex(mask.color).withValues(alpha: mask.opacity),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
-                          width: isSelected ? 2.0 : 1.0,
+                    final Widget maskWidget = ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: (mask.blurRadius / 3.5).clamp(1.0, 20.0),
+                          sigmaY: (mask.blurRadius / 3.5).clamp(1.0, 20.0),
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _colorFromHex(mask.color).withValues(alpha: mask.opacity * 0.35),
+                            border: Border.all(
+                              color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
+                              width: isSelected ? 2.0 : 1.0,
+                            ),
+                          ),
                         ),
                       ),
                     );
