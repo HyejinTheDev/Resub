@@ -93995,7 +93995,7 @@ $S:87}
 A.acs.prototype={
 $0(){var s=this.a.a
 s=s.length!==0?B.b.gaf(s).b:"99m59s999ms"
-J.b9(A.b0(this.b,!1,t.F),new A.qa(new A.fq("00m00s000ms",s,80,15,50,80,15,"#FFFFFF",0.9,!0)))},
+J.b9(A.b0(this.b,!1,t.F),new A.qa(new A.fq("00m00s000ms",s,80,15,50,80,25,"#000000",0.4,!0)))},
 $S:0}
 A.act.prototype={
 $2(a,b){var s=null

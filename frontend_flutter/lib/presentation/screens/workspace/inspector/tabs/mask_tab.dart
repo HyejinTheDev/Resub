@@ -41,9 +41,9 @@ class MaskTab extends StatelessWidget {
                         heightPercentage: 15.0,
                         xPercentage: 50.0,
                         widthPercentage: 80.0,
-                        blurRadius: 15.0,
-                        color: '#FFFFFF', // Default to white cover
-                        opacity: 0.9,     // Default to 90% opacity to block subtitle behind
+                        blurRadius: 25.0, // Default to higher radius for stronger blur
+                        color: '#000000', // Default to black tint cover
+                        opacity: 0.4,     // Default to 40% opacity
                       );
                       context.read<WorkspaceBloc>().add(AddBlurMaskEvent(newMask));
                     },

@@ -867,13 +867,16 @@ async function exportDubbedVideo({
         const blurredSrcLabel = `blurred_src_${filterIndex}`;
         const nextVLabel = `v_${filterIndex + 1}`;
 
-        const pixelSize = Math.max(2, Math.min(Math.round(mask.blurRadius || 15), Math.floor(maskWpx / 4), Math.floor(maskHpx / 4)));
+        // Use a downscaled blur technique for a massive, extremely smooth blur that completely smears text (CapCut style)
+        const scaleFactor = Math.max(0.05, Math.min(0.4, 4 / (mask.blurRadius || 15)));
+        const downW = Math.max(4, Math.round(maskWpx * scaleFactor));
+        const downH = Math.max(4, Math.round(maskHpx * scaleFactor));
 
         if (fastBlur) {
-          // Fast path: single pixelated blur + opaque cover, no alphamerge feather
+          // Fast path: single smooth blur + opaque cover, no alphamerge feather
           filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
                          `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,` +
-                         `scale=w=iw/${pixelSize}:h=ih/${pixelSize},scale=w=iw*${pixelSize}:h=ih*${pixelSize}:flags=neighbor,` +
+                         `scale=w=${downW}:h=${downH},boxblur=luma_radius=4:luma_power=3,scale=w=${maskWpx}:h=${maskHpx},` +
                          `drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
                          `[${mainLabel}][${blurredSrcLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         } else {
@@ -882,11 +885,13 @@ async function exportDubbedVideo({
           const alphaMaskLabel = `alpha_mask_${filterIndex}`;
           const featheredLabel = `feathered_${filterIndex}`;
 
+          // Horizontal-only feathering: draw the white box to the top and bottom boundaries (y=0, h=ih)
+          // and blur only horizontally by applying boxblur to the alpha mask.
           filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
                          `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
-                         `[${toBlurLabel}]scale=w=iw/${pixelSize}:h=ih/${pixelSize},scale=w=iw*${pixelSize}:h=ih*${pixelSize}:flags=neighbor,` +
+                         `[${toBlurLabel}]scale=w=${downW}:h=${downH},boxblur=luma_radius=4:luma_power=3,scale=w=${maskWpx}:h=${maskHpx},` +
                          `drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
-                         `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.03:y=ih*0.03:w=iw*0.94:h=ih*0.94:color=white:t=fill,boxblur=luma_radius=${Math.max(1, Math.floor(r / 2))}:luma_power=2[${alphaMaskLabel}];` +
+                         `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.06:y=0:w=iw*0.88:h=ih:color=white:t=fill,boxblur=luma_radius=${Math.max(2, Math.floor(maskWpx * 0.08))}:luma_power=3[alphaMaskLabel];` +
                          `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
                          `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         }
