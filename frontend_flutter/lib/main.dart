@@ -19,9 +19,11 @@ import 'presentation/bloc/project/project_bloc.dart';
 import 'presentation/screens/auth/auth_screen.dart';
 import 'presentation/screens/dashboard/project_dashboard_screen.dart';
 import 'presentation/screens/workspace/workspace_screen.dart';
+import 'presentation/screens/workspace/player/platform_view_helper.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  registerBlurMaskViewFactories();
   
   // Initialize API and Repositories for dependency injection
   final apiClient = ApiClient();
