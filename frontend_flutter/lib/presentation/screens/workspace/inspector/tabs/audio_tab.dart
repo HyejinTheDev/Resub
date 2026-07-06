@@ -19,9 +19,13 @@ class _AudioTabState extends State<AudioTab> {
   // List of standard voices
   final List<Map<String, String>> _voices = [
     {'value': 'vi-VN-HoaiMyNeural', 'label': 'Hoài My (Nữ miền Nam)'},
-    {'value': 'vi-VN-NamMinhNeural', 'label': 'Nam Minh (Nam miền Bắc)'},
-    {'value': 'vi-VN-female-reading', 'label': 'Nữ kể chuyện (CapCut)'},
-    {'value': 'vi-VN-male-reading', 'label': 'Nam kể chuyện (CapCut)'},
+    {'value': 'vi-VN-NamMinhNeural', 'label': 'Nam Minh (Nam miền Nam)'},
+    {'value': 'capcut-cogaihoatngon', 'label': 'Cô Gái Hoạt Ngôn (CapCut)'},
+    {'value': 'capcut-nhongotngao', 'label': 'Nhỏ Ngọt Ngào (CapCut)'},
+    {'value': 'capcut-nuphothong', 'label': 'Nữ Phổ Thông (CapCut)'},
+    {'value': 'capcut-giongbe', 'label': 'Giọng Bé (CapCut)'},
+    {'value': 'capcut-vietmeo', 'label': 'Việt Méo (CapCut)'},
+    {'value': 'capcut-kennydaide', 'label': 'Kenny Đại Đế (CapCut)'},
   ];
 
   @override
