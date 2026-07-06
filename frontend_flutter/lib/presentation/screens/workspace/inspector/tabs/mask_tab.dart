@@ -180,6 +180,131 @@ class MaskTab extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        const Divider(color: AppColors.border),
+                        const SizedBox(height: 8),
+                        const Text('THỜI GIAN HIỂN THỊ LÀM MỜ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
+                        const SizedBox(height: 12),
+
+                        // Start Time row
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 80,
+                              child: Text('Bắt đầu:', style: TextStyle(fontSize: 13)),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: TextEditingController(text: activeMask.startTime),
+                                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                                onSubmitted: (val) {
+                                  context.read<WorkspaceBloc>().add(
+                                        UpdateBlurMaskEvent(
+                                          index: index,
+                                          mask: activeMask.copyWith(startTime: val),
+                                        ),
+                                      );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                final currentStr = _formatMsToTimeCode(state.currentTimeMs);
+                                context.read<WorkspaceBloc>().add(
+                                      UpdateBlurMaskEvent(
+                                        index: index,
+                                        mask: activeMask.copyWith(startTime: currentStr),
+                                      ),
+                                    );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                minimumSize: Size.zero,
+                                backgroundColor: AppColors.surface,
+                              ),
+                              child: const Icon(Icons.play_arrow, size: 16, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // End Time row
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 80,
+                              child: Text('Kết thúc:', style: TextStyle(fontSize: 13)),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: TextEditingController(text: activeMask.endTime),
+                                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                                onSubmitted: (val) {
+                                  context.read<WorkspaceBloc>().add(
+                                        UpdateBlurMaskEvent(
+                                          index: index,
+                                          mask: activeMask.copyWith(endTime: val),
+                                        ),
+                                      );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                final currentStr = _formatMsToTimeCode(state.currentTimeMs);
+                                context.read<WorkspaceBloc>().add(
+                                      UpdateBlurMaskEvent(
+                                        index: index,
+                                        mask: activeMask.copyWith(endTime: currentStr),
+                                      ),
+                                    );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                minimumSize: Size.zero,
+                                backgroundColor: AppColors.surface,
+                              ),
+                              child: const Icon(Icons.play_arrow, size: 16, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Cover whole video button
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final durationMs = state.videoDurationMs > 0
+                                ? state.videoDurationMs.toInt()
+                                : 300000; // default 5m
+                            final startStr = _formatMsToTimeCode(0);
+                            final endStr = _formatMsToTimeCode(durationMs);
+                            context.read<WorkspaceBloc>().add(
+                                  UpdateBlurMaskEvent(
+                                    index: index,
+                                    mask: activeMask.copyWith(
+                                      startTime: startStr,
+                                      endTime: endStr,
+                                    ),
+                                  ),
+                                );
+                          },
+                          icon: const Icon(Icons.fullscreen, size: 16, color: Colors.black),
+                          label: const Text('Kéo phủ toàn bộ video (0s - Hết)', style: TextStyle(fontSize: 12, color: Colors.black)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(color: AppColors.border),
+                        const SizedBox(height: 12),
 
                         // Width slider
                         _buildSliderRow(
@@ -356,5 +481,13 @@ class MaskTab extends StatelessWidget {
         }
       },
     );
+  }
+
+  String _formatMsToTimeCode(int ms) {
+    final double seconds = ms / 1000.0;
+    final int m = (seconds / 60).floor();
+    final int s = (seconds % 60).floor();
+    final int milli = ((seconds % 1.0) * 1000).round();
+    return '${m.toString().padLeft(2, '0')}m${s.toString().padLeft(2, '0')}s${milli.toString().padLeft(3, '0')}ms';
   }
 }
