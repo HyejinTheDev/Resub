@@ -867,11 +867,14 @@ async function exportDubbedVideo({
         const blurredSrcLabel = `blurred_src_${filterIndex}`;
         const nextVLabel = `v_${filterIndex + 1}`;
 
+        const pixelSize = Math.max(2, Math.min(Math.round(mask.blurRadius || 15), Math.floor(maskWpx / 4), Math.floor(maskHpx / 4)));
+
         if (fastBlur) {
-          // Fast path: single blur + opaque cover, no alphamerge feather
+          // Fast path: single pixelated blur + opaque cover, no alphamerge feather
           filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
                          `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,` +
-                         `boxblur=luma_radius=${r}:luma_power=3,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
+                         `scale=w=iw/${pixelSize}:h=ih/${pixelSize},scale=w=iw*${pixelSize}:h=ih*${pixelSize}:flags=neighbor,` +
+                         `drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
                          `[${mainLabel}][${blurredSrcLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         } else {
           const toBlurLabel = `to_blur_${filterIndex}`;
@@ -881,7 +884,8 @@ async function exportDubbedVideo({
 
           filterGraph += `;[${currentVInput}]split[${mainLabel}][${cropLabel}];` +
                          `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
-                         `[${toBlurLabel}]boxblur=luma_radius=${r}:luma_power=5,drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
+                         `[${toBlurLabel}]scale=w=iw/${pixelSize}:h=ih/${pixelSize},scale=w=iw*${pixelSize}:h=ih*${pixelSize}:flags=neighbor,` +
+                         `drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
                          `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.03:y=ih*0.03:w=iw*0.94:h=ih*0.94:color=white:t=fill,boxblur=luma_radius=${Math.max(1, Math.floor(r / 2))}:luma_power=2[${alphaMaskLabel}];` +
                          `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
                          `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
