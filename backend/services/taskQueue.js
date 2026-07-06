@@ -56,17 +56,45 @@ class TaskQueue {
     this.running++;
     this.runningIds.add(job.taskId);
 
+    let finished = false;
+    // Auto-timeout job after 6 minutes (360,000 ms) to prevent server hangs
+    const timeoutMs = 360000;
+    const timeoutId = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        console.warn(`[TaskQueue ${this.name}] Job ${job.taskId} timed out after ${timeoutMs}ms`);
+        const err = new Error('Tác vụ quá thời gian cho phép (Timeout).');
+        job.reject(err);
+        this._onJobFinish(job.taskId);
+      }
+    }, timeoutMs);
+
     Promise.resolve()
       .then(() => job.fn())
-      .then(() => job.resolve())
-      .catch((err) => job.reject(err))
-      .finally(() => {
-        this.running--;
-        this.runningIds.delete(job.taskId);
-        if (this.queue.length > 0) {
-          this._run(this.queue.shift());
+      .then(() => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timeoutId);
+          job.resolve();
+          this._onJobFinish(job.taskId);
+        }
+      })
+      .catch((err) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timeoutId);
+          job.reject(err);
+          this._onJobFinish(job.taskId);
         }
       });
+  }
+
+  _onJobFinish(taskId) {
+    this.running--;
+    this.runningIds.delete(taskId);
+    if (this.queue.length > 0) {
+      this._run(this.queue.shift());
+    }
   }
 
   getStats() {

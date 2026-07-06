@@ -166,26 +166,50 @@ const KEY_MANAGER_URL = process.env.KEY_MANAGER_URL || 'http://localhost:3060';
 const KEY_MANAGER_TOKEN = process.env.KEY_MANAGER_TOKEN || 'resub_secret_key_rotation_token_123';
 
 async function fetchKeyFromManager() {
-  const response = await fetch(`${KEY_MANAGER_URL}/api/get-key`, {
-    headers: { 'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` }
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Unknown KeyManager error' }));
-    throw new Error(err.error || 'Failed to fetch API key from KeyManager');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+
+  try {
+    const response = await fetch(`${KEY_MANAGER_URL}/api/get-key`, {
+      headers: { 'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown KeyManager error' }));
+      throw new Error(err.error || 'Failed to fetch API key from KeyManager');
+    }
+    const data = await response.json();
+    return data.apiKey;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Kết nối tới KeyManager bị quá thời gian (Timeout). Vui lòng thử lại.');
+    }
+    throw err;
   }
-  const data = await response.json();
-  return data.apiKey;
 }
 
 async function reportBadKeyToManager(key, type) {
-  await fetch(`${KEY_MANAGER_URL}/api/report-bad-key`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` 
-    },
-    body: JSON.stringify({ key, type })
-  }).catch(err => console.error('[api/reportBadKey] Failed:', err.message));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+
+  try {
+    await fetch(`${KEY_MANAGER_URL}/api/report-bad-key`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` 
+      },
+      body: JSON.stringify({ key, type }),
+      signal: controller.signal
+    });
+  } catch (err) {
+    console.error('[api/reportBadKey] Failed:', err.message);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // Configure Multer for file uploads
