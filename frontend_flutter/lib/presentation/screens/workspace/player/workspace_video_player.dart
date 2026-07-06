@@ -340,7 +340,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
                                 style: TextStyle(
-                                  fontSize: (state.subtitleFontSize + 12) * 0.7,
+                                  fontSize: state.subtitleFontSize * 1.5,
                                   fontWeight: FontWeight.bold,
                                   foreground: Paint()
                                     ..style = PaintingStyle.stroke
@@ -355,7 +355,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                                 maxLines: 1,
                                 style: TextStyle(
                                   color: _colorFromHex(state.subtitleColor),
-                                  fontSize: (state.subtitleFontSize + 12) * 0.7,
+                                  fontSize: state.subtitleFontSize * 1.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
