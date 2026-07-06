@@ -94650,7 +94650,7 @@ r=s.b
 r=new A.rC(r,A.a_(r).h("rC<1>"))
 B.b.K(j,r.ghV(r).h8(0,new A.aBz(k,s,b,a),t.l7))
 if(m.d){r=m.f.d
-q=s.w+12
+q=(s.w+12)*0.7
 $.ab()
 p=A.b1()
 p.b=B.b6

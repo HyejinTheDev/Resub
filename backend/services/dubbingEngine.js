@@ -783,9 +783,8 @@ async function exportDubbedVideo({
     // 4. Subtitle file generation — ASS with exact anchor point matching the preview.
     // The editor preview renders inside a 480px-wide container, so a CSS font of
     // `fs` px corresponds to fs/480 of the video WIDTH.
-    const PREVIEW_WIDTH = 480;
     const cssFontSize = (subtitleStyle && subtitleStyle.fontSize) || 10;
-    const assFontSize = Math.max(8, Math.round(cssFontSize * (targetWidth / PREVIEW_WIDTH)));
+    const assFontSize = Math.max(6, Math.round(((cssFontSize + 12) * 0.7) * (targetWidth / PREVIEW_WIDTH)));
 
     const assPath = path.join(tempDir, 'subtitles.ass');
     generateAssFile(subtitles, assPath, {
