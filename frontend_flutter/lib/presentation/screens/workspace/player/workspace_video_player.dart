@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
@@ -189,19 +188,41 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                     final double width = constraints.maxWidth * mask.widthPercentage / 100;
                     final double height = constraints.maxHeight * mask.heightPercentage / 100;
 
-                    final Widget maskWidget = ClipRect(
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(
-                          sigmaX: (mask.blurRadius / 3.5).clamp(1.0, 20.0),
-                          sigmaY: (mask.blurRadius / 3.5).clamp(1.0, 20.0),
+                    final Widget maskWidget = Container(
+                      decoration: BoxDecoration(
+                        color: _colorFromHex(mask.color).withValues(alpha: (mask.opacity * 1.3).clamp(0.2, 0.85)),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.4),
+                          width: isSelected ? 2.5 : 1.5,
                         ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _colorFromHex(mask.color).withValues(alpha: mask.opacity * 0.35),
-                            border: Border.all(
-                              color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
-                              width: isSelected ? 2.0 : 1.0,
-                            ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Center(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.blur_on,
+                                size: (height * 0.3).clamp(12.0, 24.0),
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'HIỆU ỨNG LÀM MỜ (${mask.blurRadius.toInt()}%)',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: (height * 0.18).clamp(9.0, 12.0),
+                                  fontWeight: FontWeight.bold,
+                                  shadows: const [
+                                    Shadow(color: Colors.black54, offset: Offset(1, 1), blurRadius: 2.0),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
