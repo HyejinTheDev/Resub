@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/colors.dart';
+import '../../import/import_screen.dart';
 import 'tabs/text_tab.dart';
 import 'tabs/audio_tab.dart';
 import 'tabs/mask_tab.dart';
@@ -12,7 +13,7 @@ class InspectorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5, // Increased length to 5
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: const PreferredSize(
@@ -24,6 +25,7 @@ class InspectorPanel extends StatelessWidget {
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textMuted,
               tabs: [
+                Tab(icon: Icon(Icons.cloud_upload, size: 20), text: 'Nhập'), // New tab
                 Tab(icon: Icon(Icons.text_fields, size: 20), text: 'Chữ'),
                 Tab(icon: Icon(Icons.volume_up, size: 20), text: 'Âm'),
                 Tab(icon: Icon(Icons.blur_on, size: 20), text: 'Mờ'),
@@ -38,6 +40,7 @@ class InspectorPanel extends StatelessWidget {
           ),
           child: const TabBarView(
             children: [
+              ImportScreen(), // New tab content
               TextTab(),
               AudioTab(),
               MaskTab(),
