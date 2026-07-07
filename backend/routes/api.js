@@ -11,7 +11,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { downloadVideo } = require('../services/downloader');
 const { transcribeSegmented } = require('../services/transcriptionEngine');
-const { exportDubbedVideo, generateTTS, getFfmpegCommand, getFfprobeCommand } = require('../services/dubbingEngine');
+const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
 const { exportQueue, transcribeQueue } = require('../services/taskQueue');
 const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
 const { detectSubtitlePosition } = require('../services/geminiService');
