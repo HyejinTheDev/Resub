@@ -104,11 +104,21 @@ class ApiClient {
 
   /// Trigger video export & dubbing complex pass
   Future<Map<String, dynamic>> startDubbing(Map<String, dynamic> payload) async {
-    final response = await _dio.post(
-      '$_baseUrl/api/dub',
-      data: payload,
-    );
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/dub',
+        data: payload,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi xuất video: ${e.message}');
+    }
   }
 
   /// Poll video export status
