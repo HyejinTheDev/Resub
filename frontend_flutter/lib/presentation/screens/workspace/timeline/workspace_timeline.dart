@@ -186,7 +186,7 @@ class _WorkspaceTimelineState extends State<WorkspaceTimeline> {
                                   top: 108,
                                   width: timelineWidth,
                                   height: 38,
-                                  child: _buildAudioTrack(timelineWidth),
+                                  child: _buildAudioTrack(state, timelineWidth),
                                 ),
 
                                 // Vertical Playhead Red Line
@@ -388,9 +388,70 @@ class _WorkspaceTimelineState extends State<WorkspaceTimeline> {
     );
   }
 
-  Widget _buildAudioTrack(double width) {
+  Widget _buildAudioTrack(WorkspaceState state, double timelineWidth) {
+    final List<Widget> blocks = [];
+
+    // Background simulated waveform
+    blocks.add(
+      Positioned.fill(
+        child: CustomPaint(
+          painter: WaveformPainter(),
+        ),
+      ),
+    );
+
+    for (int i = 0; i < state.subtitles.length; i++) {
+      final sub = state.subtitles[i];
+      final startMs = _parseTimeToMs(sub.startTime);
+      final endMs = _parseTimeToMs(sub.endTime);
+
+      final double left = startMs * _pixelsPerMs;
+      final double width = (endMs - startMs) * _pixelsPerMs;
+
+      final bool isSelected = state.selectedSubtitleIndex == i;
+      final bool isActive = state.currentTimeMs >= startMs && state.currentTimeMs <= endMs;
+
+      blocks.add(
+        Positioned(
+          left: left,
+          width: width.clamp(15.0, 10000.0),
+          top: 4,
+          bottom: 4,
+          child: GestureDetector(
+            onTap: () {
+              context.read<WorkspaceBloc>().add(SelectSubtitleEvent(i));
+              context.read<WorkspaceBloc>().add(RequestSeekEvent(startMs));
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF0D9488) // Active Teal
+                    : (isActive ? const Color(0xFF0F766E) : const Color(0xFF115E59)), // Dark Teal
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isSelected ? Colors.white : Colors.white24,
+                  width: isSelected ? 1.5 : 0.5,
+                ),
+              ),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Text(
+                sub.text,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.white70,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
-      width: width,
+      width: timelineWidth,
       decoration: BoxDecoration(
         color: const Color(0xFF0C1020).withValues(alpha: 0.3),
         border: const Border(
@@ -398,8 +459,8 @@ class _WorkspaceTimelineState extends State<WorkspaceTimeline> {
           bottom: BorderSide(color: Colors.white10),
         ),
       ),
-      child: CustomPaint(
-        painter: WaveformPainter(),
+      child: Stack(
+        children: blocks,
       ),
     );
   }
