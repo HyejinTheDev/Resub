@@ -108,7 +108,8 @@ router.get('/test-ffmpeg', (req, res) => {
       ffmpegPath: ffmpeg,
       hasAss,
       version: version.split('\n')[0],
-      filters: filters.split('\n').filter(f => f.includes('ass') || f.includes('sub'))
+      filters: filters.split('\n').filter(f => f.includes('ass') || f.includes('sub')),
+      lastFfmpegError: global.lastFfmpegError || 'No errors logged yet.'
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

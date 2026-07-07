@@ -1082,6 +1082,7 @@ async function exportDubbedVideo({
         else if (code === 0) resolve();
         else {
           console.error('[dubbingEngine] Video pass failed. Filter graph:', filterGraph);
+          global.lastFfmpegError = `Filter Graph: ${filterGraph}\n\nStderr:\n${stderr}`;
           reject(new Error(`FFmpeg export failed with code ${code}. Stderr: ${stderr.substring(stderr.length - 2500)}`));
         }
       });
