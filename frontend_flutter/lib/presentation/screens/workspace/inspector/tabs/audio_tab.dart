@@ -132,6 +132,25 @@ class _AudioTabState extends State<AudioTab> {
                   }
                 },
               ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.playlist_add_check, size: 16),
+                label: const Text('Áp dụng giọng này cho tất cả câu thoại'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white10,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  context.read<WorkspaceBloc>().add(BulkVoiceChangeEvent(state.defaultVoice));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã cập nhật giọng đọc cho toàn bộ câu thoại!'),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
 
               // CapCut Cookie text field
