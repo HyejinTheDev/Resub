@@ -200,6 +200,8 @@ const CAPCUT_VOICES = {
   'capcut-kennydaide': { speaker: 'BV075_streaming_demon_dsp', item_id: '7569442422665661712' }
 };
 
+const PREVIEW_WIDTH = 480;
+
 
 async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
   if (!capcutCookie) {
