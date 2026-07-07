@@ -754,6 +754,9 @@ async function exportDubbedVideo({
   onProgress = () => {},
   cancelToken = { cancelled: false, proc: null }
 }) {
+  videoPath = path.resolve(videoPath);
+  outputPath = path.resolve(outputPath);
+
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
