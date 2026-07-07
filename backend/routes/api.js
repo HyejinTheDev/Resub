@@ -11,7 +11,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { downloadVideo } = require('../services/downloader');
 const { transcribeSegmented } = require('../services/transcriptionEngine');
-const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../services/dubbingEngine');
+const { exportDubbedVideo, generateTTS, getFfmpegCommand, getFfprobeCommand } = require('../services/dubbingEngine');
 const { exportQueue, transcribeQueue } = require('../services/taskQueue');
 const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
 const { detectSubtitlePosition } = require('../services/geminiService');
@@ -96,6 +96,23 @@ router.post('/auth/login', (req, res) => {
 // Google Auth configuration endpoint
 router.get('/auth/google-config', (req, res) => {
   res.json({ clientId: GOOGLE_CLIENT_ID });
+});
+
+router.get('/test-ffmpeg', (req, res) => {
+  try {
+    const ffmpeg = getFfmpegCommand();
+    const filters = execSync(`${ffmpeg} -filters`).toString();
+    const hasAss = filters.includes('ass');
+    const version = execSync(`${ffmpeg} -version`).toString();
+    res.json({
+      ffmpegPath: ffmpeg,
+      hasAss,
+      version: version.split('\n')[0],
+      filters: filters.split('\n').filter(f => f.includes('ass') || f.includes('sub'))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Google Auth verification & login/register endpoint
