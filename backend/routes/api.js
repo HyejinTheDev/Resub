@@ -4,6 +4,9 @@ const fs = require('fs');
 const multer = require('multer');
 const { spawn, execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
+const User = require('../models/User');
 
 const { OAuth2Client } = require('google-auth-library');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '874744439002-c4q4lhmlhndu81c3c97u4k4l2v4rbl7k.apps.googleusercontent.com';
@@ -44,53 +47,78 @@ function writeUsers(users) {
 }
 
 // Auth endpoints
-router.post('/auth/register', (req, res) => {
+router.post('/auth/register', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối! Vui lòng thiết lập MONGODB_URI.' });
+  }
+
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
-  const users = readUsers();
-  const exists = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-  if (exists) {
-    return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại!' });
+  try {
+    const exists = await User.findOne({ username: username.toLowerCase() });
+    if (exists) {
+      return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại!' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = new User({
+      username: username,
+      password: hashedPassword
+    });
+
+    await newUser.save();
+
+    res.json({
+      success: true,
+      user: { id: newUser.id, username: newUser.username }
+    });
+  } catch (error) {
+    console.error('[auth/register] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi đăng ký tài khoản: ' + error.message });
   }
-
-  const newUser = {
-    id: uuidv4(),
-    username,
-    password, // Store simply for local project use
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(newUser);
-  writeUsers(users);
-
-  res.json({
-    success: true,
-    user: { id: newUser.id, username: newUser.username }
-  });
 });
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối! Vui lòng thiết lập MONGODB_URI.' });
+  }
+
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
-  const users = readUsers();
-  const user = users.find(
-    u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-  );
+  try {
+    const user = await User.findOne({ username: username.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
+    }
 
-  if (!user) {
-    return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      // Legacy plaintext migration fallback
+      if (user.password === password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        await user.save();
+      } else {
+        return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
+      }
+    }
+
+    res.json({
+      success: true,
+      user: { id: user.id, username: user.username }
+    });
+  } catch (error) {
+    console.error('[auth/login] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi đăng nhập: ' + error.message });
   }
-
-  res.json({
-    success: true,
-    user: { id: user.id, username: user.username }
-  });
 });
 
 // Google Auth configuration endpoint
@@ -118,13 +146,16 @@ router.get('/test-ffmpeg', (req, res) => {
 
 // Google Auth verification & login/register endpoint
 router.post('/auth/google', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối! Vui lòng thiết lập MONGODB_URI.' });
+  }
+
   const { credential } = req.body;
   if (!credential) {
     return res.status(400).json({ error: 'ID Token (credential) is required' });
   }
 
   try {
-    // Verify token with Google API
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: GOOGLE_CLIENT_ID
@@ -140,30 +171,39 @@ router.post('/auth/google', async (req, res) => {
       return res.status(400).json({ error: 'Email not provided by Google' });
     }
 
-    // Map email username (e.g. name@gmail.com -> name)
     const username = email.split('@')[0];
 
-    const users = readUsers();
-    let user = users.find(u => u.email === email || u.username.toLowerCase() === username.toLowerCase());
+    let user = await User.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        { username: username.toLowerCase() }
+      ]
+    });
 
     if (!user) {
-      // Auto-register new Google user
-      user = {
-        id: uuidv4(),
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(uuidv4(), salt);
+
+      user = new User({
         username,
         email,
         avatar: picture,
-        password: uuidv4(), // Random password
-        createdAt: new Date().toISOString()
-      };
-      users.push(user);
-      writeUsers(users);
+        password: hashedPassword
+      });
+      await user.save();
       console.log(`[Google Auth] Auto-registered new user: ${username} (${email})`);
     } else {
-      // Update avatar if changed
+      let changed = false;
+      if (!user.email) {
+        user.email = email;
+        changed = true;
+      }
       if (picture && user.avatar !== picture) {
         user.avatar = picture;
-        writeUsers(users);
+        changed = true;
+      }
+      if (changed) {
+        await user.save();
       }
       console.log(`[Google Auth] Logged in existing user: ${user.username} (${email})`);
     }
