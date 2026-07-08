@@ -19,6 +19,7 @@ class _ExportTabState extends State<ExportTab> {
   String _quality = 'medium'; // low, medium, high
   String _resolution = '720'; // 1080, 720, 480
   bool _burnSubtitles = true;
+  double _videoSpeed = 1.0;
 
   // Local Export State
   bool _isExporting = false;
@@ -94,7 +95,6 @@ class _ExportTabState extends State<ExportTab> {
       };
     }).toList();
 
-    // Combined payload
     final Map<String, dynamic> payload = {
       'videoPath': state.videoData['videoPath'] ?? '',
       'audioPath': state.videoData['audioPath'] ?? '',
@@ -107,6 +107,7 @@ class _ExportTabState extends State<ExportTab> {
       'quality': _quality,
       'resolution': _resolution,
       'burnSubtitles': _burnSubtitles,
+      'videoSpeed': _videoSpeed,
     };
 
     setState(() {
@@ -246,6 +247,32 @@ class _ExportTabState extends State<ExportTab> {
                         if (val != null) {
                           setState(() {
                             _resolution = val;
+                          });
+                        }
+                      },
+              ),
+              const SizedBox(height: 16),
+
+              // Video Speed dropdown
+              DropdownButtonFormField<double>(
+                initialValue: _videoSpeed,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Tốc độ video thành phẩm (Giãn lồng tiếng)',
+                ),
+                dropdownColor: AppColors.surface,
+                items: const [
+                  DropdownMenuItem(value: 1.0, child: Text('1.0x (Tốc độ gốc - bình thường)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.9091, child: Text('0.91x (Chậm đi 10% - Dễ lồng tiếng)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.8333, child: Text('0.83x (Chậm đi 20% - Giọng chuẩn 1.0x)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.7692, child: Text('0.77x (Chậm đi 30% - Thích hợp nhất)', style: TextStyle(color: Colors.white))),
+                ],
+                onChanged: _isExporting
+                    ? null
+                    : (val) {
+                        if (val != null) {
+                          setState(() {
+                            _videoSpeed = val;
                           });
                         }
                       },

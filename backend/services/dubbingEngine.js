@@ -460,7 +460,7 @@ async function mixOneTtsBatch(ffmpeg, batch, startIndex, ttsVolume, cwd, cancelT
 
   let graph = '';
   batch.forEach((file, idx) => {
-    graph += `[${idx}:a]adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[a${idx}];`;
+    graph += `[${idx}:a]aresample=44100,aformat=sample_fmts=s16:channel_layouts=stereo,adelay=${file.startMs}|${file.startMs},volume=${ttsVolume}[a${idx}];`;
   });
   const labels = batch.map((_, idx) => `[a${idx}]`).join('');
   graph += `${labels}amix=inputs=${batch.length}:duration=longest:dropout_transition=0:normalize=0[batch]`;
@@ -508,10 +508,12 @@ async function mixTtsTracksBatched(ffmpeg, ttsFiles, ttsVolume, outputPath, canc
 /**
  * Pass A: background audio + all TTS tracks → mixed_audio.m4a
  */
-async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, cwd) {
+async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, cwd, videoSpeed = 1.0) {
   const hasAudio = await videoHasAudioStream(videoPath);
   const videoDurSec = await getAudioDuration(videoPath);
-  const safeDur = Math.max(1, Math.ceil(videoDurSec || 60));
+  const parsedSpeed = parseFloat(videoSpeed) || 1.0;
+  const speedFactor = 1.0 / parsedSpeed;
+  const safeDur = Math.max(1, Math.ceil((videoDurSec * speedFactor) || 60));
 
   const ttsMixedPath = path.join(cwd, 'tts_only.wav');
   if (ttsFiles.length > 0) {
@@ -528,9 +530,17 @@ async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume,
   let graph;
   if (ttsFiles.length > 0) {
     args.push('-i', ttsMixedPath);
-    graph = `[0:a]volume=${bgVolume}[bg];[1:a]volume=1.0[tts];[bg][tts]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[aout]`;
+    if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
+      graph = `[0:a]atempo=${parsedSpeed.toFixed(4)},volume=${bgVolume}[bg];[1:a]volume=1.0[tts];[bg][tts]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[aout]`;
+    } else {
+      graph = `[0:a]volume=${bgVolume}[bg];[1:a]volume=1.0[tts];[bg][tts]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[aout]`;
+    }
   } else {
-    graph = `[0:a]volume=${bgVolume}[aout]`;
+    if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
+      graph = `[0:a]atempo=${parsedSpeed.toFixed(4)},volume=${bgVolume}[aout]`;
+    } else {
+      graph = `[0:a]volume=${bgVolume}[aout]`;
+    }
   }
 
   args.push('-filter_complex', graph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', mixedAudioPath);
@@ -569,8 +579,8 @@ async function getAudioDuration(filePath) {
  */
 async function adjustAudioSpeed(inputPath, outputPath, speed) {
   return new Promise((resolve, reject) => {
-    // Clamp speed between 0.5 and 2.0 (FFmpeg limit for atempo)
-    const clampedSpeed = Math.min(Math.max(speed, 0.5), 2.0);
+    // Clamp speed between 0.5 and 1.4 (Natural speech limit to avoid distortion)
+    const clampedSpeed = Math.min(Math.max(speed, 0.5), 1.4);
     const ffmpeg = getFfmpegCommand();
     
     // If speed is very close to 1.0, just copy the file
@@ -587,6 +597,9 @@ async function adjustAudioSpeed(inputPath, outputPath, speed) {
       '-y',
       '-i', inputPath,
       '-filter:a', `atempo=${clampedSpeed.toFixed(2)}`,
+      '-c:a', 'libmp3lame',
+      '-q:a', '2',      // High quality VBR Q2
+      '-ar', '44100',   // Resample to 44.1kHz
       outputPath
     ];
 
@@ -625,6 +638,19 @@ function parseTimeToMs(timeStr) {
   }
 
   return parseFloat(timeStr) * 1000 || 0;
+}
+
+/**
+ * Format milliseconds back to 00m00s000ms format
+ */
+function formatMsToTimeStr(ms) {
+  const mins = Math.floor(ms / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  const msecs = Math.round(ms % 1000);
+  const minsStr = String(mins).padStart(2, '0');
+  const secsStr = String(secs).padStart(2, '0');
+  const msecsStr = String(msecs).padStart(3, '0');
+  return `${minsStr}m${secsStr}s${msecsStr}ms`;
 }
 
 /**
@@ -751,11 +777,40 @@ async function exportDubbedVideo({
   exportResolution = 'original',
   exportQuality = 'medium',
   burnSubtitles = true,
+  videoSpeed = 1.0,
   onProgress = () => {},
   cancelToken = { cancelled: false, proc: null }
 }) {
   videoPath = path.resolve(videoPath);
   outputPath = path.resolve(outputPath);
+
+  const parsedSpeed = parseFloat(videoSpeed) || 1.0;
+  const speedFactor = 1.0 / parsedSpeed;
+
+  if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
+    console.log(`[dubbingEngine] Scaling timeline for videoSpeed=${parsedSpeed} (factor=${speedFactor.toFixed(4)})...`);
+    subtitles = subtitles.map(sub => {
+      const startMs = parseTimeToMs(sub.startTime);
+      const endMs = parseTimeToMs(sub.endTime);
+      return {
+        ...sub,
+        startTime: formatMsToTimeStr(startMs * speedFactor),
+        endTime: formatMsToTimeStr(endMs * speedFactor)
+      };
+    });
+
+    if (Array.isArray(blurMasks)) {
+      blurMasks = blurMasks.map(mask => {
+        const startMs = parseTimeToMs(mask.startTime);
+        const endMs = parseTimeToMs(mask.endTime);
+        return {
+          ...mask,
+          startTime: formatMsToTimeStr(startMs * speedFactor),
+          endTime: formatMsToTimeStr(endMs * speedFactor)
+        };
+      });
+    }
+  }
 
   const tempDir = path.join(os.tmpdir(), `resub_export_${uuidv4()}`);
   fs.mkdirSync(tempDir, { recursive: true });
@@ -826,7 +881,7 @@ async function exportDubbedVideo({
     onProgress({ percent: 56, message: 'Đang trộn giọng đọc với nhạc nền...' });
 
     const mixedAudioPath = path.join(tempDir, 'mixed_audio.m4a');
-    await buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, tempDir);
+    await buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, tempDir, videoSpeed);
 
     // Video filter graph (transform, blur, crop, scale, subtitles) is built below;
     // segments are appended with a leading ';' and the first one is stripped before use.
@@ -880,9 +935,14 @@ async function exportDubbedVideo({
     let currentVInput = '0:v';
     let filterIndex = 0;
 
+    if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
+      filterGraph += `;[0:v]setpts=${speedFactor.toFixed(4)}*PTS[vslowed]`;
+      currentVInput = 'vslowed';
+    }
+
     if (hasTransform) {
       const rotateLabel = `vrotated`;
-      filterGraph += `;[0:v]scale=w=iw*${zoom}/100:h=ih*${zoom}/100,rotate=angle=${rotation}*PI/180:fillcolor=black[${rotateLabel}];`;
+      filterGraph += `;[${currentVInput}]scale=w=iw*${zoom}/100:h=ih*${zoom}/100,rotate=angle=${rotation}*PI/180:fillcolor=black[${rotateLabel}];`;
       filterGraph += `color=c=black:s=${originalDimensions.width}x${originalDimensions.height}[vbg];`;
       filterGraph += `[vbg][${rotateLabel}]overlay=x=(W-w)/2+W*${xOffset}/100:y=(H-h)/2+H*${yOffset}/100[vtransformed]`;
       
@@ -996,7 +1056,8 @@ async function exportDubbedVideo({
       activeMasks.length === 0 &&
       !hasTransform &&
       (!cropStyle || cropStyle.aspectRatio === 'original') &&
-      (!exportResolution || exportResolution === 'original');
+      (!exportResolution || exportResolution === 'original') &&
+      (!parsedSpeed || Math.abs(parsedSpeed - 1.0) < 0.02);
 
     let ffmpegArgs;
     if (canCopyVideo) {
@@ -1069,7 +1130,8 @@ async function exportDubbedVideo({
         const timeMatch = chunk.match(/time=(\d+):(\d+):(\d+)\.(\d+)/);
         if (timeMatch && videoDurationSec > 0) {
           const encodedSec = parseInt(timeMatch[1], 10) * 3600 + parseInt(timeMatch[2], 10) * 60 + parseInt(timeMatch[3], 10);
-          const ffmpegRatio = Math.min(encodedSec / videoDurationSec, 1);
+          const targetDuration = videoDurationSec * speedFactor;
+          const ffmpegRatio = Math.min(encodedSec / targetDuration, 1);
           onProgress({
             percent: Math.round(60 + ffmpegRatio * 38),
             message: `Đang xử lý video: ${Math.round(ffmpegRatio * 100)}% (FFmpeg)...`
