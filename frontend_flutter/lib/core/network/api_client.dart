@@ -11,8 +11,9 @@ class ApiClient {
   String _baseUrl = 'http://localhost:3051';
 
   ApiClient() : _dio = Dio() {
-    _dio.options.connectTimeout = const Duration(seconds: 30);
-    _dio.options.receiveTimeout = const Duration(minutes: 5);
+    _dio.options.connectTimeout = const Duration(minutes: 5);
+    _dio.options.sendTimeout = const Duration(minutes: 15);
+    _dio.options.receiveTimeout = const Duration(minutes: 15);
 
     if (kIsWeb) {
       final String origin = Uri.base.origin;
