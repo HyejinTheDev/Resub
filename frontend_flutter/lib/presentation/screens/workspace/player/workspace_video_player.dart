@@ -107,12 +107,29 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
-              if (errorMsg != null) ...[
+              if (errorMsg != null || (_controller != null && _controller!.value.hasError)) ...[
                 const SizedBox(height: 12),
                 Text(
-                  'Lỗi: $errorMsg',
+                  'Lỗi: ${errorMsg ?? _controller?.value.errorDescription ?? "Không thể khởi tạo trình phát video."}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Thử tải lại video'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white10,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _controller?.removeListener(_onPlayerUpdate);
+                      _controller?.dispose();
+                      _controller = null;
+                      _initializeController();
+                    });
+                  },
                 ),
               ],
             ],
