@@ -734,17 +734,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
       .replace(/[{}]/g, '')
       .replace(/\r?\n/g, ' ');
 
-    const baseSize = fontSize;
-    const wPercent = s.widthPercent !== undefined ? s.widthPercent : 80;
-    const allowedWidth = Math.round(width * wPercent / 100);
-    const approxTextWidth = cleanText.length * baseSize * 0.52;
-    
-    let lineFontSize = baseSize;
-    if (approxTextWidth > allowedWidth && cleanText.length > 0) {
-      lineFontSize = Math.max(6, Math.floor(allowedWidth / (cleanText.length * 0.52)));
-    }
-
-    return `Dialogue: 0,${formatMsToAssTime(startMs)},${formatMsToAssTime(endMs)},Default,,0,0,0,,{\\an5\\pos(${cx},${cy})\\fs${lineFontSize}}${cleanText}`;
+    return `Dialogue: 0,${formatMsToAssTime(startMs)},${formatMsToAssTime(endMs)},Default,,0,0,0,,{\\an5\\pos(${cx},${cy})}${cleanText}`;
   }).join('\n');
 
   fs.writeFileSync(assPath, `${header}\n${events}\n`, 'utf-8');
