@@ -970,7 +970,7 @@ async function exportDubbedVideo({
                          `[${cropLabel}]crop=w=iw*${w}/100:h=ih*${h}/100:x=iw*(${x}-${w}/2)/100:y=ih*(${y}-${h}/2)/100,split[${toBlurLabel}][${toMaskLabel}];` +
                          `[${toBlurLabel}]scale=w=${downW}:h=${downH},boxblur=luma_radius=${Math.max(1, Math.min(4, Math.floor((downW - 1) / 2), Math.floor((downH - 1) / 2)))}:luma_power=3:chroma_radius=0:chroma_power=0,scale=w=${maskWpx}:h=${maskHpx},` +
                          `drawbox=x=0:y=0:w=iw:h=ih:color=${ffmpegColor}@${coverOpacity}:t=fill[${blurredSrcLabel}];` +
-                         `[${toMaskLabel}]drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.06:y=0:w=iw*0.88:h=ih:color=white:t=fill,boxblur=luma_radius=${Math.max(1, Math.min(30, Math.floor((maskWpx - 1) / 2), Math.floor((maskHpx - 1) / 2)))}:luma_power=3:chroma_radius=0:chroma_power=0[${alphaMaskLabel}];` +
+                         `[${toMaskLabel}]scale=w=${maskWpx}:h=${maskHpx},drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill,drawbox=x=iw*0.06:y=0:w=iw*0.88:h=ih:color=white:t=fill,boxblur=luma_radius=${Math.max(1, Math.min(30, Math.floor((maskWpx - 1) / 2), Math.floor((maskHpx - 1) / 2)))}:luma_power=3:chroma_radius=0:chroma_power=0[${alphaMaskLabel}];` +
                          `[${blurredSrcLabel}][${alphaMaskLabel}]alphamerge[${featheredLabel}];` +
                          `[${mainLabel}][${featheredLabel}]overlay=x=W*(${x}-${w}/2)/100:y=H*(${y}-${h}/2)/100:enable='between(t,${start},${end})'[${nextVLabel}]`;
         }
