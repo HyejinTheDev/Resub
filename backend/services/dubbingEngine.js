@@ -787,18 +787,42 @@ async function exportDubbedVideo({
   const parsedSpeed = parseFloat(videoSpeed) || 1.0;
   const speedFactor = 1.0 / parsedSpeed;
 
-  if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
-    console.log(`[dubbingEngine] Scaling timeline for videoSpeed=${parsedSpeed} (factor=${speedFactor.toFixed(4)})...`);
-    subtitles = subtitles.map(sub => {
-      const startMs = parseTimeToMs(sub.startTime);
-      const endMs = parseTimeToMs(sub.endTime);
-      return {
-        ...sub,
-        startTime: formatMsToTimeStr(startMs * speedFactor),
-        endTime: formatMsToTimeStr(endMs * speedFactor)
-      };
-    });
+  // 1. Parse and scale subtitle timestamps
+  let processedSubtitles = subtitles.map((sub) => {
+    const startMs = parseTimeToMs(sub.startTime) * speedFactor;
+    const endMs = parseTimeToMs(sub.endTime) * speedFactor;
+    return {
+      ...sub,
+      startMs,
+      endMs
+    };
+  });
 
+  // 2. Sanitize overlapping intervals to prevent text overlapping on screen
+  for (let i = 0; i < processedSubtitles.length - 1; i++) {
+    const current = processedSubtitles[i];
+    const next = processedSubtitles[i + 1];
+    if (current.endMs > next.startMs) {
+      console.log(`[dubbingEngine] Overlap resolved: Sub ${i} end adjusted from ${current.endMs}ms to ${next.startMs}ms.`);
+      current.endMs = next.startMs;
+      if (current.endMs <= current.startMs) {
+        current.endMs = current.startMs + 50; // minimum 50ms duration
+      }
+    }
+  }
+
+  // 3. Format back to standard time strings
+  subtitles = processedSubtitles.map(sub => {
+    return {
+      ...sub,
+      startTime: formatMsToTimeStr(sub.startMs),
+      endTime: formatMsToTimeStr(sub.endMs)
+    };
+  });
+
+  // 4. Scale blurMasks if speed is adjusted
+  if (parsedSpeed && Math.abs(parsedSpeed - 1.0) >= 0.02) {
+    console.log(`[dubbingEngine] Scaling blurMasks timeline for videoSpeed=${parsedSpeed}...`);
     if (Array.isArray(blurMasks)) {
       blurMasks = blurMasks.map(mask => {
         const startMs = parseTimeToMs(mask.startTime);
