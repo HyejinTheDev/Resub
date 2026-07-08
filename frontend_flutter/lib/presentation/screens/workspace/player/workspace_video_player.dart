@@ -164,10 +164,13 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
         final currentY = _isDraggingSubtitle ? _dragYPercent : state.subtitleYPercent;
         final showSnappingGuide = _isDraggingSubtitle && (currentY - 50.0).abs() < 2.0;
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            return Container(
-              color: Colors.black,
+        return Column(
+          children: [
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Container(
+                    color: Colors.black,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -382,69 +385,67 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                       ),
                     ),
 
-                  // 5. Playback Controller Buttons overlay (glassmorphic bottom bar)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      color: Colors.black.withValues(alpha: 0.6),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                if (_controller!.value.isPlaying) {
-                                  _controller!.pause();
-                                } else {
-                                  _controller!.play();
-                                }
-                              });
-                            },
-                          ),
-                          Text(
-                            _formatDuration(_controller!.value.position),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                          Expanded(
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                activeTrackColor: AppColors.primary,
-                                inactiveTrackColor: AppColors.border,
-                                thumbColor: AppColors.primary,
-                                trackHeight: 3,
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                              ),
-                              child: Slider(
-                                min: 0.0,
-                                max: _controller!.value.duration.inMilliseconds.toDouble(),
-                                value: _controller!.value.position.inMilliseconds.toDouble().clamp(
-                                  0.0,
-                                  _controller!.value.duration.inMilliseconds.toDouble(),
-                                ),
-                                onChanged: (value) {
-                                  _controller!.seekTo(Duration(milliseconds: value.toInt()));
-                                },
-                              ),
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(_controller!.value.duration),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             );
           },
+        ),
+            ),
+            // 5. Playback Controller Buttons (placed below the video area)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.black, // Solid black
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (_controller!.value.isPlaying) {
+                          _controller!.pause();
+                        } else {
+                          _controller!.play();
+                        }
+                      });
+                    },
+                  ),
+                  Text(
+                    _formatDuration(_controller!.value.position),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: AppColors.primary,
+                        inactiveTrackColor: AppColors.border,
+                        thumbColor: AppColors.primary,
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      ),
+                      child: Slider(
+                        min: 0.0,
+                        max: _controller!.value.duration.inMilliseconds.toDouble(),
+                        value: _controller!.value.position.inMilliseconds.toDouble().clamp(
+                          0.0,
+                          _controller!.value.duration.inMilliseconds.toDouble(),
+                        ),
+                        onChanged: (value) {
+                          _controller!.seekTo(Duration(milliseconds: value.toInt()));
+                        },
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(_controller!.value.duration),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     ),
