@@ -21,6 +21,10 @@ RESUB is a powerful web-based application designed for automated Chinese to Viet
 
 ## Tech Stack
 
+## Build Info
+
+Triggered rebuild to resolve Hugging Face scheduling issue.
+
 - **Frontend**: React, Vite, CSS, Lucide icons.
 - **Backend**: Node.js, Express, FFmpeg.
 - **AI Models**: Gemini API (for transcription and translation), Microsoft Edge TTS (for voiceover audio).
