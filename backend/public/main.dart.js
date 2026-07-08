@@ -94140,35 +94140,38 @@ s=""+B.d.aH(B.d.bu(p,60))
 if(o>0)return"Kho\u1ea3ng ~ "+o+" ph\xfat "+s+" gi\xe2y"
 else return"Kho\u1ea3ng ~ "+s+" gi\xe2y"},
 Ao(a,b){return this.amf(a,b)},
-amf(a,b){var s=0,r=A.I(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h,g,f,e,d
-var $async$Ao=A.J(function(c,a0){if(c===1){p.push(a0)
-s=q}while(true)switch(s){case 0:h=A.aLv(a,t.h5)
-g=b.a
-f=A.a_(g).h("a9<1,aB<l,l>>")
-e=A.a4(new A.a9(g,new A.asS(b),f),f.h("ar.E"))
-g=b.b
-f=A.a_(g).h("a9<1,aB<l,u>>")
-k=A.a4(new A.a9(g,new A.asT(),f),f.h("ar.E"))
-g=b.c
-f=J.ax(g)
-j=f.i(g,"videoPath")
-if(j==null)j=""
-g=f.i(g,"audioPath")
+amf(a0,a1){var s=0,r=A.I(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h,g,f,e,d,c,b,a
+var $async$Ao=A.J(function(a2,a3){if(a2===1){p.push(a3)
+s=q}while(true)switch(s){case 0:e=A.aLv(a0,t.h5)
+d=a1.a
+c=A.a_(d).h("a9<1,aB<l,l>>")
+b=A.a4(new A.a9(d,new A.asS(a1),c),c.h("ar.E"))
+d=a1.b
+c=A.a_(d).h("a9<1,aB<l,u>>")
+k=A.a4(new A.a9(d,new A.asT(),c),c.h("ar.E"))
+d=t.N
+c=t.z
+j=A.ad(["fontSize",a1.w,"yPercent",a1.x,"color",a1.y,"outlineColor",a1.z,"bold",!1,"italic",!1],d,c)
+i=a1.c
+h=J.ax(i)
+g=h.i(i,"videoPath")
 if(g==null)g=""
-n=A.ad(["videoPath",j,"audioPath",g,"subtitles",e,"blurMasks",k,"bgVolume",b.d,"ttsVolume",b.e,"defaultVoice",b.f,"capcutCookie",b.r,"quality",o.d,"resolution",o.e,"burnSubtitles",o.f,"videoSpeed",o.r],t.N,t.z)
+i=h.i(i,"audioPath")
+if(i==null)i=""
+n=A.ad(["videoPath",g,"audioPath",i,"subtitles",b,"blurMasks",k,"subtitleStyle",j,"bgVolume",a1.d,"ttsVolume",a1.e,"defaultVoice",a1.f,"capcutCookie",a1.r,"quality",o.d,"resolution",o.e,"burnSubtitles",o.f,"videoSpeed",o.r],d,c)
 o.X(new A.asU(o))
 q=3
 s=6
-return A.K(h.lu(n),$async$Ao)
-case 6:m=a0
+return A.K(e.lu(n),$async$Ao)
+case 6:m=a3
 o.as=m
-o.ak4(h,m)
+o.ak4(e,m)
 q=1
 s=5
 break
 case 3:q=2
-d=p.pop()
-l=A.ah(d)
+a=p.pop()
+l=A.ah(a)
 o.X(new A.asV(o,l))
 s=5
 break

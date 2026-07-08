@@ -1022,7 +1022,7 @@ async function exportDubbedVideo({
         const r = Math.min(mask.blurRadius || 15, maxRadius);
         const hexColor = mask.color || '#000000';
         const userOpacity = mask.opacity !== undefined ? mask.opacity : 0.15;
-        const coverOpacity = Math.min(1, Math.max(userOpacity, 0.88));
+        const coverOpacity = userOpacity;
         const ffmpegColor = `0x${hexColor.slice(1)}`;
 
         const mainLabel = `main_${filterIndex}`;

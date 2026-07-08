@@ -95,11 +95,21 @@ class _ExportTabState extends State<ExportTab> {
       };
     }).toList();
 
+    final Map<String, dynamic> subtitleStyleJson = {
+      'fontSize': state.subtitleFontSize,
+      'yPercent': state.subtitleYPercent,
+      'color': state.subtitleColor,
+      'outlineColor': state.subtitleOutlineColor,
+      'bold': false,
+      'italic': false,
+    };
+
     final Map<String, dynamic> payload = {
       'videoPath': state.videoData['videoPath'] ?? '',
       'audioPath': state.videoData['audioPath'] ?? '',
       'subtitles': subtitlesJson,
       'blurMasks': masksJson,
+      'subtitleStyle': subtitleStyleJson,
       'bgVolume': state.bgVolume,
       'ttsVolume': state.ttsVolume,
       'defaultVoice': state.defaultVoice,
