@@ -23,7 +23,7 @@ RESUB is a powerful web-based application designed for automated Chinese to Viet
 
 ## Build Info
 
-Triggered rebuild to resolve Hugging Face scheduling issue.
+Triggered rebuild to resolve Hugging Face scheduling issue: 2026-07-08T20:13:30+07:00.
 
 - **Frontend**: React, Vite, CSS, Lucide icons.
 - **Backend**: Node.js, Express, FFmpeg.
