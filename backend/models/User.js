@@ -12,7 +12,8 @@ const UserSchema = new mongoose.Schema({
     type: String,
     lowercase: true,
     trim: true,
-    sparse: true // Allows multiple null/empty emails for non-Google users
+    unique: true,
+    sparse: true // Allows legacy null values while enforcing uniqueness for new emails
   },
   avatar: {
     type: String
@@ -20,6 +21,16 @@ const UserSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true
+  },
+  isVerified: {
+    type: Boolean,
+    default: false // Requires OTP verification for new registrations
+  },
+  otpCode: {
+    type: String
+  },
+  otpExpires: {
+    type: Date
   },
   createdAt: {
     type: Date,

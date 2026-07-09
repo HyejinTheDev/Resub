@@ -21,12 +21,36 @@ class LoginRequestedEvent extends AuthEvent {
 
 class RegisterRequestedEvent extends AuthEvent {
   final String username;
+  final String email;
   final String password;
 
-  const RegisterRequestedEvent({required this.username, required this.password});
+  const RegisterRequestedEvent({
+    required this.username,
+    required this.email,
+    required this.password,
+  });
 
   @override
-  List<Object?> get props => [username, password];
+  List<Object?> get props => [username, email, password];
+}
+
+class VerifyOtpRequestedEvent extends AuthEvent {
+  final String email;
+  final String otpCode;
+
+  const VerifyOtpRequestedEvent({required this.email, required this.otpCode});
+
+  @override
+  List<Object?> get props => [email, otpCode];
+}
+
+class ResendOtpRequestedEvent extends AuthEvent {
+  final String email;
+
+  const ResendOtpRequestedEvent({required this.email});
+
+  @override
+  List<Object?> get props => [email];
 }
 
 class GoogleLoginRequestedEvent extends AuthEvent {

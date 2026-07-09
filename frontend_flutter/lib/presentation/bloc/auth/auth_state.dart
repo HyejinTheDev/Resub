@@ -31,3 +31,13 @@ class AuthFailure extends AuthState {
   @override
   List<Object?> get props => [error];
 }
+
+class AuthOtpPending extends AuthState {
+  final String email;
+  final String? message;
+
+  const AuthOtpPending({required this.email, this.message});
+
+  @override
+  List<Object?> get props => [email, message];
+}

@@ -200,6 +200,9 @@ class ApiClient {
       if (e.response != null && e.response?.data != null) {
         final data = e.response?.data;
         if (data is Map && data.containsKey('error')) {
+          if (data['otpPending'] == true) {
+            throw Exception('OTP_PENDING:${data['email']}:${data['error']}');
+          }
           throw Exception(data['error']);
         }
       }
@@ -208,11 +211,19 @@ class ApiClient {
   }
 
   /// Register user
-  Future<Map<String, dynamic>> register(String username, String password) async {
+  Future<Map<String, dynamic>> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
     try {
       final response = await _dio.post(
         '$_baseUrl/api/auth/register',
-        data: {'username': username, 'password': password},
+        data: {
+          'username': username,
+          'email': email,
+          'password': password,
+        },
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -222,7 +233,45 @@ class ApiClient {
           throw Exception(data['error']);
         }
       }
-      throw Exception('Tài khoản đã tồn tại!');
+      throw Exception('Lỗi đăng ký tài khoản!');
+    }
+  }
+
+  /// Verify register OTP code
+  Future<Map<String, dynamic>> verifyOtp(String email, String otpCode) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/verify-otp',
+        data: {'email': email, 'otpCode': otpCode},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Xác thực OTP thất bại!');
+    }
+  }
+
+  /// Resend register OTP code
+  Future<Map<String, dynamic>> resendOtp(String email) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/resend-otp',
+        data: {'email': email},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Gửi lại mã OTP thất bại!');
     }
   }
 

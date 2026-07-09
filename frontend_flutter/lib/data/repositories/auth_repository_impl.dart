@@ -60,14 +60,39 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<UserModel> register(String username, String password) async {
-    final result = await apiClient.register(username, password);
+  Future<Map<String, dynamic>> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
+    final result = await apiClient.register(
+      username: username,
+      email: email,
+      password: password,
+    );
+    if (result['success'] == true) {
+      return result;
+    }
+    throw Exception(result['error'] ?? 'Đăng ký thất bại');
+  }
+
+  @override
+  Future<UserModel> verifyOtp(String email, String otpCode) async {
+    final result = await apiClient.verifyOtp(email, otpCode);
     if (result['user'] != null) {
       final user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
       await _cacheUser(user);
       return user;
     }
-    throw Exception(result['error'] ?? 'Đăng ký thất bại');
+    throw Exception(result['error'] ?? 'Xác thực OTP thất bại');
+  }
+
+  @override
+  Future<void> resendOtp(String email) async {
+    final result = await apiClient.resendOtp(email);
+    if (result['success'] != true) {
+      throw Exception(result['error'] ?? 'Gửi lại mã OTP thất bại');
+    }
   }
 
   @override

@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { sendOtpEmail } = require('../services/emailService');
 
 const { OAuth2Client } = require('google-auth-library');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '874744439002-c4q4lhmlhndu81c3c97u4k4l2v4rbl7k.apps.googleusercontent.com';
@@ -52,9 +53,9 @@ router.post('/auth/register', async (req, res) => {
     return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối! Vui lòng thiết lập MONGODB_URI.' });
   }
 
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: 'Tên đăng nhập, Email và Mật khẩu là bắt buộc!' });
   }
 
   try {
@@ -63,23 +64,128 @@ router.post('/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Tên đăng nhập đã tồn tại!' });
     }
 
+    const emailExists = await User.findOne({ email: email.toLowerCase() });
+    if (emailExists) {
+      return res.status(400).json({ error: 'Địa chỉ Email này đã được đăng ký!' });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
     const newUser = new User({
       username: username,
-      password: hashedPassword
+      email: email,
+      password: hashedPassword,
+      isVerified: false,
+      otpCode: otpCode,
+      otpExpires: otpExpires
     });
 
     await newUser.save();
 
+    const mailSent = await sendOtpEmail(email, otpCode);
+    if (!mailSent) {
+      console.log(`[Demo/Testing Fallback] Email SMTP not configured. OTP Code for ${email} is: ${otpCode}`);
+    }
+
     res.json({
       success: true,
-      user: { id: newUser.id, username: newUser.username }
+      message: 'Mã xác thực OTP đã được gửi tới email của bạn!',
+      email: email,
+      otpPending: true
     });
   } catch (error) {
     console.error('[auth/register] Error:', error.message);
     res.status(500).json({ error: 'Lỗi đăng ký tài khoản: ' + error.message });
+  }
+});
+
+router.post('/auth/verify-otp', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối!' });
+  }
+
+  const { email, otpCode } = req.body;
+  if (!email || !otpCode) {
+    return res.status(400).json({ error: 'Email và mã OTP là bắt buộc!' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ error: 'Tài khoản không tồn tại!' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: 'Tài khoản đã được xác thực từ trước!' });
+    }
+
+    if (user.otpCode !== otpCode) {
+      return res.status(400).json({ error: 'Mã OTP nhập vào không chính xác!' });
+    }
+
+    if (new Date() > user.otpExpires) {
+      return res.status(400).json({ error: 'Mã OTP đã hết hạn! Vui lòng nhấn gửi lại.' });
+    }
+
+    user.isVerified = true;
+    user.otpCode = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Xác thực tài khoản thành công!',
+      user: { id: user.id, username: user.username, email: user.email }
+    });
+  } catch (error) {
+    console.error('[auth/verify-otp] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi xác thực OTP: ' + error.message });
+  }
+});
+
+router.post('/auth/resend-otp', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối!' });
+  }
+
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email là bắt buộc!' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(400).json({ error: 'Tài khoản không tồn tại!' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: 'Tài khoản đã được xác thực!' });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+
+    user.otpCode = otpCode;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    const mailSent = await sendOtpEmail(email, otpCode);
+    if (!mailSent) {
+      console.log(`[Demo/Testing Fallback] Email SMTP not configured. Re-sent OTP Code for ${email} is: ${otpCode}`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Mã OTP mới đã được gửi lại vào email của bạn!'
+    });
+  } catch (error) {
+    console.error('[auth/resend-otp] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi gửi lại mã OTP: ' + error.message });
   }
 });
 
@@ -111,9 +217,23 @@ router.post('/auth/login', async (req, res) => {
       }
     }
 
+    // Auto-verify legacy users without email
+    if (!user.email) {
+      user.isVerified = true;
+      await user.save();
+    }
+
+    if (!user.isVerified) {
+      return res.status(401).json({
+        error: 'Tài khoản chưa được kích hoạt!',
+        otpPending: true,
+        email: user.email
+      });
+    }
+
     res.json({
       success: true,
-      user: { id: user.id, username: user.username }
+      user: { id: user.id, username: user.username, email: user.email }
     });
   } catch (error) {
     console.error('[auth/login] Error:', error.message);
@@ -188,7 +308,8 @@ router.post('/auth/google', async (req, res) => {
         username,
         email,
         avatar: picture,
-        password: hashedPassword
+        password: hashedPassword,
+        isVerified: true // Google users are pre-verified
       });
       await user.save();
       console.log(`[Google Auth] Auto-registered new user: ${username} (${email})`);
@@ -196,6 +317,10 @@ router.post('/auth/google', async (req, res) => {
       let changed = false;
       if (!user.email) {
         user.email = email;
+        changed = true;
+      }
+      if (!user.isVerified) {
+        user.isVerified = true;
         changed = true;
       }
       if (picture && user.avatar !== picture) {
