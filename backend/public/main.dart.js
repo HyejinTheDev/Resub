@@ -96251,7 +96251,7 @@ n=a0?b:m.gaiv()
 m=A.a8(20,B.h.n()>>>16&255,B.h.n()>>>8&255,B.h.n()&255)
 l=A.bC(10)
 m=A.aNo(b,b,A.a8(5,B.h.n()>>>16&255,B.h.n()>>>8&255,B.h.n()&255),b,b,b,b,b,b,B.h,b,b,B.kd,b,new A.cJ(l,B.r),new A.aV(m,1,B.o,-1),b,b,b,b)
-j.push(A.aZj(new A.wn(A.b_f(b,b,new A.wY("https://developers.google.com/static/identity/images/g-logo.png",1,b,B.a2R)),18,18,b),B.a0P,n,m))
+j.push(A.aZj(new A.wn(A.b_f(b,b,new A.wY("g-logo.png",1,b,B.a2R)),18,18,b),B.a0P,n,m))
 B.b.K(o,j)}return A.aGU(a1,A.a4W(A.bo(b,A.bV(o,B.W,B.p,B.bQ),B.m,b,B.D_,new A.bH(s,b,q,r,p,b,B.M),b,b,b,B.IC,b,b,b),new A.pW(16,16,b)),B.c4)},
 $S:617}
 A.as4.prototype={

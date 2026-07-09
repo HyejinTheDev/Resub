@@ -670,7 +670,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   backgroundColor: Colors.white.withOpacity(0.02),
                                 ),
                                 icon: Image.network(
-                                  'https://developers.google.com/static/identity/images/g-logo.png',
+                                  'g-logo.png',
                                   height: 18,
                                   width: 18,
                                 ),
