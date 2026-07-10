@@ -1281,5 +1281,7 @@ router.post('/load-split-segment', async (req, res) => {
     console.error('Failed to load split segment:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
 module.exports = router;
 
