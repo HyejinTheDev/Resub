@@ -226,7 +226,12 @@ router.post('/auth/login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ username: username.toLowerCase() });
+    const user = await User.findOne({
+      $or: [
+        { username: username.toLowerCase() },
+        { email: username.toLowerCase() }
+      ]
+    });
     if (!user) {
       return res.status(400).json({ error: 'Sai tên đăng nhập hoặc mật khẩu!' });
     }

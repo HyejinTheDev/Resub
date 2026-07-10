@@ -567,9 +567,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
                               // Username Input
                               _buildInputField(
-                                label: 'Tên đăng nhập',
+                                label: 'Tên đăng nhập hoặc Email',
                                 controller: _usernameController,
-                                hintText: 'Tên tài khoản của bạn',
+                                hintText: 'Tên tài khoản hoặc email của bạn',
                                 icon: Icons.person_outline,
                                 enabled: !isLoading,
                               ),
