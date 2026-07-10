@@ -15,4 +15,5 @@ abstract class AuthRepository {
   Future<String?> getGoogleClientId();
   Future<UserModel> getUserProfile(String userId);
   Future<UserModel> upgradeToPro(String userId);
+  Future<String> createPaymentLink(String userId);
 }

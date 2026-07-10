@@ -340,6 +340,25 @@ class ApiClient {
     }
   }
 
+  /// Create a PayOS checkout payment link
+  Future<Map<String, dynamic>> createPaymentLink(String userId) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/payment/create-link',
+        data: {'userId': userId},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi tạo liên kết thanh toán: ${e.message}');
+    }
+  }
+
   /// Generate TTS preview audio URL
   Future<Map<String, dynamic>> ttsPreview({
     required String text,

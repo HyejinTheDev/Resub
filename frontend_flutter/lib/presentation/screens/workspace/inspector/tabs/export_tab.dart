@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../core/constants/colors.dart';
 import '../../../../../domain/repositories/video_repository.dart';
+import '../../../../../domain/repositories/auth_repository.dart';
 import '../../../../bloc/workspace/workspace_bloc.dart';
 import '../../../../bloc/workspace/workspace_state.dart';
 import '../../../../bloc/auth/auth_bloc.dart';
@@ -505,133 +507,193 @@ class _ExportTabState extends State<ExportTab> {
   }
 
   void _showUpgradeDialog(BuildContext context, String userId) {
+    final authRepository = RepositoryProvider.of<AuthRepository>(context);
+    bool isGeneratingLink = false;
+    Timer? checkPaymentTimer;
+
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        return BlocConsumer<AuthBloc, AuthState>(
-          listener: (context, authState) {
-            if (authState is Authenticated) {
-              final remaining = authState.user.videoExportQuota - authState.user.videoExportUsed;
-              if (remaining > 0) {
-                // Successfully upgraded! Close dialog
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Nâng cấp lên gói PRO thành công!'),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
-              }
-            } else if (authState is AuthFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Nâng cấp thất bại: ${authState.error}'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            }
-          },
-          builder: (context, authState) {
-            final bool isUpgrading = authState is AuthLoading;
-
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131520),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(28.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.workspace_premium_rounded,
-                      color: AppColors.primary,
-                      size: 64,
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Nâng Cấp Hạng Tài Khoản',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Bạn đã sử dụng hết hạn ngạch xuất video miễn phí của gói FREE (10 lượt).\n\nHãy nâng cấp lên gói PRO để nhận ngay:',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Features list
-                    _buildFeatureItem(Icons.movie_filter_outlined, '100 lượt xuất video chất lượng cao'),
-                    const SizedBox(height: 10),
-                    _buildFeatureItem(Icons.timer_outlined, 'Cho phép xuất video thời lượng dài hơn'),
-                    const SizedBox(height: 10),
-                    _buildFeatureItem(Icons.bolt_rounded, 'Ưu tiên kết xuất tốc độ tối đa'),
-                    const SizedBox(height: 28),
-
-                    // Actions
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: isUpgrading ? null : () => Navigator.of(dialogContext).pop(),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white60,
-                              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: const Text('Bỏ qua'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: isUpgrading
-                                ? null
-                                : () {
-                                    context.read<AuthBloc>().add(UpgradeToProEvent(userId: userId));
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: isUpgrading
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
-                                  )
-                                : const Text(
-                                    'Nâng Cấp PRO',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                          ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return BlocConsumer<AuthBloc, AuthState>(
+              listener: (context, authState) {
+                if (authState is Authenticated) {
+                  if (authState.user.subscriptionTier == 'pro') {
+                    // Success!
+                    checkPaymentTimer?.cancel();
+                    Navigator.of(dialogContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Nâng cấp lên gói PRO thành công!'),
+                        backgroundColor: AppColors.primary,
+                      ),
+                    );
+                  }
+                }
+              },
+              builder: (context, authState) {
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131520),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
+                    padding: const EdgeInsets.all(28.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: AppColors.primary,
+                          size: 64,
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Nâng Cấp Gói PRO',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        const SizedBox(height: 12),
+                        if (checkPaymentTimer == null) ...[
+                          Text(
+                            'Nâng cấp lên gói PRO để nhận ngay 100 lượt xuất video chất lượng cao cùng các quyền lợi ưu tiên.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildFeatureItem(Icons.movie_filter_outlined, '100 lượt xuất video chất lượng cao'),
+                          const SizedBox(height: 10),
+                          _buildFeatureItem(Icons.timer_outlined, 'Cho phép xuất video thời lượng dài hơn'),
+                          const SizedBox(height: 10),
+                          _buildFeatureItem(Icons.bolt_rounded, 'Ưu tiên kết xuất tốc độ tối đa'),
+                          const SizedBox(height: 28),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white60,
+                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Bỏ qua'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: isGeneratingLink
+                                      ? null
+                                      : () async {
+                                          final authBloc = BlocProvider.of<AuthBloc>(context);
+                                          final messenger = ScaffoldMessenger.of(context);
+                                          setDialogState(() {
+                                            isGeneratingLink = true;
+                                          });
+                                          try {
+                                            final checkoutUrl = await authRepository.createPaymentLink(userId);
+                                            await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+                                            
+                                            // Start polling for payment success
+                                            setDialogState(() {
+                                              isGeneratingLink = false;
+                                              checkPaymentTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+                                                if (mounted) {
+                                                  authBloc.add(RefreshProfileEvent(userId: userId));
+                                                }
+                                              });
+                                            });
+                                          } catch (e) {
+                                            setDialogState(() {
+                                              isGeneratingLink = false;
+                                            });
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(e.toString().replaceAll('Exception: ', '')),
+                                                backgroundColor: AppColors.error,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: isGeneratingLink
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                                        )
+                                      : const Text(
+                                          'Thanh Toán QR',
+                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CircularProgressIndicator(strokeWidth: 3.5, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Đang Chờ Chuyển Khoản...',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Vui lòng quét mã VietQR trên trang thanh toán PayOS vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                          ),
+                          const SizedBox(height: 28),
+                          OutlinedButton(
+                            onPressed: () {
+                              checkPaymentTimer?.cancel();
+                              Navigator.of(dialogContext).pop();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white60,
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              minimumSize: const Size(double.infinity, 44),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Hủy giao dịch'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         );
       },
-    );
+    ).then((_) {
+      checkPaymentTimer?.cancel();
+    });
   }
 
   Widget _buildFeatureItem(IconData icon, String text) {

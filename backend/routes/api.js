@@ -7,7 +7,26 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const Payment = require('../models/Payment');
+const PayOS = require('@payos/node');
 const { sendOtpEmail } = require('../services/emailService');
+
+const PAYOS_CLIENT_ID = process.env.PAYOS_CLIENT_ID || '';
+const PAYOS_API_KEY = process.env.PAYOS_API_KEY || '';
+const PAYOS_CHECKSUM_KEY = process.env.PAYOS_CHECKSUM_KEY || '';
+
+let payos = null;
+if (PAYOS_CLIENT_ID && PAYOS_API_KEY && PAYOS_CHECKSUM_KEY) {
+  try {
+    payos = new PayOS(PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY);
+    console.log('[PayOS] Initialized payment gateway successfully.');
+  } catch (err) {
+    console.error('[PayOS] Initialization failed:', err.message);
+  }
+} else {
+  console.log('[PayOS] Missing environment configurations. Payment link generation will be disabled.');
+}
+
 
 const { OAuth2Client } = require('google-auth-library');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '874744439002-c4q4lhmlhndu81c3c97u4k4l2v4rbl7k.apps.googleusercontent.com';
@@ -440,6 +459,128 @@ router.post('/auth/upgrade', async (req, res) => {
     res.status(500).json({ error: 'Lỗi nâng cấp tài khoản: ' + error.message });
   }
 });
+
+
+// Create payment link using PayOS
+router.post('/payment/create-link', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối!' });
+  }
+
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  if (!payos) {
+    return res.status(503).json({ error: 'Cổng thanh toán PayOS chưa được cấu hình! Vui lòng thiết lập các khóa PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY trong file .env.' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    }
+
+    const amount = 199000;
+    // Generate unique numeric orderCode
+    const orderCode = Math.floor(100000 + Math.random() * 900000) + Math.floor(Date.now() / 100000) * 10;
+
+    // Create payment entry in our DB
+    const payment = new Payment({
+      userId: user._id,
+      orderCode,
+      amount,
+      status: 'pending'
+    });
+    await payment.save();
+
+    // Construct callback URLs
+    const publicBase = getPublicBaseUrl(req);
+    const returnUrl = `${publicBase}/#/payment/success`;
+    const cancelUrl = `${publicBase}/#/payment/cancel`;
+
+    // Create payment link via PayOS SDK
+    const paymentLinkData = {
+      orderCode,
+      amount,
+      description: `ResubPro ${user.username}`.substring(0, 25), // PayOS description limit is 25 characters
+      cancelUrl,
+      returnUrl
+    };
+
+    const result = await payos.createPaymentLink(paymentLinkData);
+
+    res.json({
+      success: true,
+      checkoutUrl: result.checkoutUrl,
+      orderCode,
+      amount
+    });
+  } catch (error) {
+    console.error('[payment/create-link] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi tạo liên kết thanh toán: ' + error.message });
+  }
+});
+
+// PayOS Webhook receiver
+router.post('/payment/payos-webhook', async (req, res) => {
+  const webhookData = req.body;
+  console.log('[PayOS Webhook] Received notification:', JSON.stringify(webhookData));
+
+  // PayOS test webhook confirmation
+  if (webhookData.desc === 'confirm' || webhookData.description === 'confirm') {
+    return res.json({ success: true, message: 'Webhook registered successfully' });
+  }
+
+  try {
+    if (!payos) {
+      return res.status(500).json({ error: 'PayOS SDK not initialized' });
+    }
+
+    // Verify webhook signature
+    const verifiedData = payos.verifyPaymentWebhookData(webhookData);
+    if (!verifiedData) {
+      return res.status(400).json({ error: 'Chữ ký webhook không hợp lệ!' });
+    }
+
+    const { orderCode, amount } = verifiedData;
+
+    // Find payment transaction
+    const payment = await Payment.findOne({ orderCode });
+    if (!payment) {
+      console.warn(`[PayOS Webhook] Transaction not found for orderCode: ${orderCode}`);
+      return res.status(404).json({ error: 'Không tìm thấy giao dịch chuyển khoản' });
+    }
+
+    if (payment.status === 'completed') {
+      console.log(`[PayOS Webhook] Transaction ${orderCode} was already completed.`);
+      return res.json({ success: true, message: 'Giao dịch đã được xử lý.' });
+    }
+
+    // Update status
+    payment.status = 'completed';
+    await payment.save();
+
+    // Upgrade user
+    const user = await User.findById(payment.userId);
+    if (user) {
+      user.subscriptionTier = 'pro';
+      user.videoExportQuota = 100;
+      await user.save();
+      console.log(`[PayOS Webhook] Successfully upgraded user ${user.username} to PRO.`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Xác nhận thanh toán và nâng cấp gói PRO thành công!'
+    });
+  } catch (error) {
+    console.error('[PayOS Webhook Error]:', error.message);
+    res.status(400).json({ error: 'Lỗi xác minh Webhook: ' + error.message });
+  }
+});
+
 
 
 

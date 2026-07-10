@@ -150,6 +150,16 @@ class AuthRepositoryImpl implements AuthRepository {
     throw Exception(result['error'] ?? 'Nâng cấp tài khoản thất bại');
   }
 
+  @override
+  Future<String> createPaymentLink(String userId) async {
+    final result = await apiClient.createPaymentLink(userId);
+    if (result['checkoutUrl'] != null) {
+      return result['checkoutUrl'].toString();
+    }
+    throw Exception(result['error'] ?? 'Không thể khởi tạo liên kết thanh toán');
+  }
+
+
   Future<void> _cacheUser(UserModel user) async {
     final userStr = jsonEncode(user.toJson());
     try {
