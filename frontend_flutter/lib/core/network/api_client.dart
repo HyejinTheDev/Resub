@@ -302,6 +302,44 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Get updated user profile/subscription info
+  Future<Map<String, dynamic>> getUserProfile(String userId) async {
+    try {
+      final response = await _dio.get(
+        '$_baseUrl/api/auth/profile',
+        queryParameters: {'userId': userId},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi đồng bộ thông tin: ${e.message}');
+    }
+  }
+
+  /// Upgrade user to Pro package (simulation)
+  Future<Map<String, dynamic>> upgradeToPro(String userId) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/auth/upgrade',
+        data: {'userId': userId},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi nâng cấp tài khoản: ${e.message}');
+    }
+  }
+
   /// Generate TTS preview audio URL
   Future<Map<String, dynamic>> ttsPreview({
     required String text,

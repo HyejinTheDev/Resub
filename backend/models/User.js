@@ -32,6 +32,19 @@ const UserSchema = new mongoose.Schema({
   otpExpires: {
     type: Date
   },
+  subscriptionTier: {
+    type: String,
+    enum: ['free', 'pro'],
+    default: 'free'
+  },
+  videoExportQuota: {
+    type: Number,
+    default: 10
+  },
+  videoExportUsed: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

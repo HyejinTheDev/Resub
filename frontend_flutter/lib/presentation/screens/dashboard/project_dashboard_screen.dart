@@ -79,14 +79,89 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
     String username = 'Khách';
+    String subscriptionTier = 'FREE';
+    int used = 0;
+    int quota = 10;
+    String? userId;
+
     if (authState is Authenticated) {
       username = authState.user.username;
+      subscriptionTier = authState.user.subscriptionTier.toUpperCase();
+      used = authState.user.videoExportUsed;
+      quota = authState.user.videoExportQuota;
+      userId = authState.user.id;
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('RESUB — Auto Dubbing Dashboard'),
         actions: [
+          if (authState is Authenticated) ...[
+            // Subscription Quota Display
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: subscriptionTier == 'PRO'
+                      ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: subscriptionTier == 'PRO'
+                        ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                        : AppColors.border,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      subscriptionTier == 'PRO'
+                          ? Icons.workspace_premium_rounded
+                          : Icons.card_membership_outlined,
+                      size: 14,
+                      color: subscriptionTier == 'PRO'
+                          ? const Color(0xFF34D399)
+                          : Colors.white70,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Gói $subscriptionTier (${quota - used < 0 ? 0 : quota - used}/$quota lượt)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: subscriptionTier == 'PRO'
+                            ? const Color(0xFF34D399)
+                            : Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            
+            // Upgrade Pro Button if Free
+            if (subscriptionTier == 'FREE' && userId != null) ...[
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => _showUpgradeDialog(context, userId!),
+                  icon: const Icon(Icons.bolt, size: 14, color: AppColors.primary),
+                  label: const Text(
+                    'Nâng cấp PRO',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ],
+
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             child: Center(
@@ -401,6 +476,151 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showUpgradeDialog(BuildContext context, String userId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return BlocConsumer<AuthBloc, AuthState>(
+          listener: (context, authState) {
+            if (authState is Authenticated) {
+              final remaining = authState.user.videoExportQuota - authState.user.videoExportUsed;
+              if (remaining > 0) {
+                // Successfully upgraded! Close dialog
+                Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Nâng cấp lên gói PRO thành công!'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            } else if (authState is AuthFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Nâng cấp thất bại: ${authState.error}'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+          builder: (context, authState) {
+            final bool isUpgrading = authState is AuthLoading;
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131520),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(28.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: AppColors.primary,
+                      size: 64,
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Nâng Cấp Hạng Tài Khoản',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Nâng cấp từ gói FREE lên gói PRO để nhận ngay các quyền lợi đặc quyền:',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Features list
+                    _buildFeatureItem(Icons.movie_filter_outlined, '100 lượt xuất video chất lượng cao'),
+                    const SizedBox(height: 10),
+                    _buildFeatureItem(Icons.timer_outlined, 'Cho phép xuất video thời lượng dài hơn'),
+                    const SizedBox(height: 10),
+                    _buildFeatureItem(Icons.bolt_rounded, 'Ưu tiên kết xuất tốc độ tối đa'),
+                    const SizedBox(height: 28),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isUpgrading ? null : () => Navigator.of(dialogContext).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white60,
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Bỏ qua'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isUpgrading
+                                ? null
+                                : () {
+                                    context.read<AuthBloc>().add(UpgradeToProEvent(userId: userId));
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: isUpgrading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                                  )
+                                : const Text(
+                                    'Nâng Cấp PRO',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 18),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+        ),
+      ],
     );
   }
 }

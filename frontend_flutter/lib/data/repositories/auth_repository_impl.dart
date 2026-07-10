@@ -128,6 +128,28 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<UserModel> getUserProfile(String userId) async {
+    final result = await apiClient.getUserProfile(userId);
+    if (result['user'] != null) {
+      final user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
+      await _cacheUser(user);
+      return user;
+    }
+    throw Exception(result['error'] ?? 'Đồng bộ thông tin thất bại');
+  }
+
+  @override
+  Future<UserModel> upgradeToPro(String userId) async {
+    final result = await apiClient.upgradeToPro(userId);
+    if (result['user'] != null) {
+      final user = UserModel.fromJson(result['user'] as Map<String, dynamic>);
+      await _cacheUser(user);
+      return user;
+    }
+    throw Exception(result['error'] ?? 'Nâng cấp tài khoản thất bại');
+  }
+
   Future<void> _cacheUser(UserModel user) async {
     final userStr = jsonEncode(user.toJson());
     try {

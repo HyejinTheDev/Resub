@@ -7,6 +7,9 @@ import '../../../../../core/constants/colors.dart';
 import '../../../../../domain/repositories/video_repository.dart';
 import '../../../../bloc/workspace/workspace_bloc.dart';
 import '../../../../bloc/workspace/workspace_state.dart';
+import '../../../../bloc/auth/auth_bloc.dart';
+import '../../../../bloc/auth/auth_event.dart';
+import '../../../../bloc/auth/auth_state.dart';
 
 class ExportTab extends StatefulWidget {
   const ExportTab({super.key});
@@ -68,6 +71,19 @@ class _ExportTabState extends State<ExportTab> {
   Future<void> _startExport(BuildContext context, WorkspaceState state) async {
     final videoRepository = RepositoryProvider.of<VideoRepository>(context);
 
+    final authState = context.read<AuthBloc>().state;
+    String? userId;
+    if (authState is Authenticated) {
+      final user = authState.user;
+      userId = user.id;
+      final used = user.videoExportUsed;
+      final quota = user.videoExportQuota;
+      if (used >= quota) {
+        _showUpgradeDialog(context, user.id);
+        return;
+      }
+    }
+
     // Prepare subtitles array matching backend format
     final List<Map<String, dynamic>> subtitlesJson = state.subtitles.map((sub) {
       return {
@@ -118,6 +134,7 @@ class _ExportTabState extends State<ExportTab> {
       'resolution': _resolution,
       'burnSubtitles': _burnSubtitles,
       'videoSpeed': _videoSpeed,
+      if (userId != null) 'userId': userId,
     };
 
     setState(() {
@@ -156,6 +173,13 @@ class _ExportTabState extends State<ExportTab> {
             _statusMessage = 'Xuất video hoàn tất!';
             _downloadUrl = progress['videoUrl'];
           });
+          // Refresh user profile to update quota remaining
+          if (mounted) {
+            final authState = context.read<AuthBloc>().state;
+            if (authState is Authenticated) {
+              context.read<AuthBloc>().add(RefreshProfileEvent(userId: authState.user.id));
+            }
+          }
         } else if (status == 'error') {
           timer.cancel();
           setState(() {
@@ -347,6 +371,38 @@ class _ExportTabState extends State<ExportTab> {
                 ),
                 const SizedBox(height: 20),
                 
+                // Export Quota Display
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, authState) {
+                    if (authState is Authenticated) {
+                      final user = authState.user;
+                      final remaining = user.videoExportQuota - user.videoExportUsed;
+                      final tier = user.subscriptionTier.toUpperCase();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Gói tài khoản: $tier',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
+                            ),
+                            Text(
+                              'Còn lại: ${remaining < 0 ? 0 : remaining} / ${user.videoExportQuota} lượt xuất',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: remaining <= 0 ? Colors.redAccent : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox();
+                  },
+                ),
+                
                 // Export Button
                 ElevatedButton(
                   onPressed: () => _startExport(context, state),
@@ -445,6 +501,151 @@ class _ExportTabState extends State<ExportTab> {
           ),
         );
       },
+    );
+  }
+
+  void _showUpgradeDialog(BuildContext context, String userId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return BlocConsumer<AuthBloc, AuthState>(
+          listener: (context, authState) {
+            if (authState is Authenticated) {
+              final remaining = authState.user.videoExportQuota - authState.user.videoExportUsed;
+              if (remaining > 0) {
+                // Successfully upgraded! Close dialog
+                Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Nâng cấp lên gói PRO thành công!'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            } else if (authState is AuthFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Nâng cấp thất bại: ${authState.error}'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+          builder: (context, authState) {
+            final bool isUpgrading = authState is AuthLoading;
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131520),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(28.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: AppColors.primary,
+                      size: 64,
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Nâng Cấp Hạng Tài Khoản',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Bạn đã sử dụng hết hạn ngạch xuất video miễn phí của gói FREE (10 lượt).\n\nHãy nâng cấp lên gói PRO để nhận ngay:',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Features list
+                    _buildFeatureItem(Icons.movie_filter_outlined, '100 lượt xuất video chất lượng cao'),
+                    const SizedBox(height: 10),
+                    _buildFeatureItem(Icons.timer_outlined, 'Cho phép xuất video thời lượng dài hơn'),
+                    const SizedBox(height: 10),
+                    _buildFeatureItem(Icons.bolt_rounded, 'Ưu tiên kết xuất tốc độ tối đa'),
+                    const SizedBox(height: 28),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isUpgrading ? null : () => Navigator.of(dialogContext).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white60,
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Bỏ qua'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isUpgrading
+                                ? null
+                                : () {
+                                    context.read<AuthBloc>().add(UpgradeToProEvent(userId: userId));
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: isUpgrading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                                  )
+                                : const Text(
+                                    'Nâng Cấp PRO',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 18),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
+        ),
+      ],
     );
   }
 }

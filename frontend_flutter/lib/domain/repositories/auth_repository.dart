@@ -13,4 +13,6 @@ abstract class AuthRepository {
   Future<UserModel> loginWithGoogle(String credential);
   Future<void> logout();
   Future<String?> getGoogleClientId();
+  Future<UserModel> getUserProfile(String userId);
+  Future<UserModel> upgradeToPro(String userId);
 }

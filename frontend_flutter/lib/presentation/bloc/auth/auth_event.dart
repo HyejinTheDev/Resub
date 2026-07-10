@@ -63,3 +63,21 @@ class GoogleLoginRequestedEvent extends AuthEvent {
 }
 
 class LogoutRequestedEvent extends AuthEvent {}
+
+class RefreshProfileEvent extends AuthEvent {
+  final String userId;
+
+  const RefreshProfileEvent({required this.userId});
+
+  @override
+  List<Object?> get props => [userId];
+}
+
+class UpgradeToProEvent extends AuthEvent {
+  final String userId;
+
+  const UpgradeToProEvent({required this.userId});
+
+  @override
+  List<Object?> get props => [userId];
+}

@@ -139,7 +139,14 @@ router.post('/auth/verify-otp', async (req, res) => {
     res.json({
       success: true,
       message: 'Xác thực tài khoản thành công!',
-      user: { id: user.id, username: user.username, email: user.email }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        subscriptionTier: user.subscriptionTier || 'free',
+        videoExportQuota: user.videoExportQuota || 10,
+        videoExportUsed: user.videoExportUsed || 0
+      }
     });
   } catch (error) {
     console.error('[auth/verify-otp] Error:', error.message);
@@ -233,7 +240,14 @@ router.post('/auth/login', async (req, res) => {
 
     res.json({
       success: true,
-      user: { id: user.id, username: user.username, email: user.email }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        subscriptionTier: user.subscriptionTier || 'free',
+        videoExportQuota: user.videoExportQuota || 10,
+        videoExportUsed: user.videoExportUsed || 0
+      }
     });
   } catch (error) {
     console.error('[auth/login] Error:', error.message);
@@ -335,13 +349,98 @@ router.post('/auth/google', async (req, res) => {
 
     res.json({
       success: true,
-      user: { id: user.id, username: user.username, email: user.email, avatar: user.avatar }
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        subscriptionTier: user.subscriptionTier || 'free',
+        videoExportQuota: user.videoExportQuota || 10,
+        videoExportUsed: user.videoExportUsed || 0
+      }
     });
   } catch (error) {
     console.error('[Google Auth Error]:', error.message);
     res.status(400).json({ error: `Xác thực Google thất bại: ${error.message}` });
   }
 });
+
+
+// Get updated user profile/subscription info
+router.get('/auth/profile', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối!' });
+  }
+
+  const { userId } = req.query;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        subscriptionTier: user.subscriptionTier || 'free',
+        videoExportQuota: user.videoExportQuota || 10,
+        videoExportUsed: user.videoExportUsed || 0
+      }
+    });
+  } catch (error) {
+    console.error('[auth/profile] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi đồng bộ hồ sơ: ' + error.message });
+  }
+});
+
+// Upgrade user to Pro package (simulation)
+router.post('/auth/upgrade', async (req, res) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'Cơ sở dữ liệu chưa được kết nối!' });
+  }
+
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    }
+
+    user.subscriptionTier = 'pro';
+    user.videoExportQuota = 100;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Nâng cấp lên gói PRO thành công!',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        subscriptionTier: user.subscriptionTier,
+        videoExportQuota: user.videoExportQuota,
+        videoExportUsed: user.videoExportUsed
+      }
+    });
+  } catch (error) {
+    console.error('[auth/upgrade] Error:', error.message);
+    res.status(500).json({ error: 'Lỗi nâng cấp tài khoản: ' + error.message });
+  }
+});
+
 
 
 // KeyManager Server Integration Configuration
@@ -712,14 +811,43 @@ router.get('/transcribe-status', (req, res) => {
 global.dubProgress = global.dubProgress || {};
 global.dubTasks = global.dubTasks || {};
 
-router.post('/dub', (req, res) => {
-  const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality, burnSubtitles, videoSpeed } = req.body;
+router.post('/dub', async (req, res) => {
+  const { videoPath, subtitles, voice, bgVolume, ttsVolume, blurMask, blurMasks, subtitleStyle, capcutCookie, cropStyle, videoTransform, exportResolution, exportQuality, burnSubtitles, videoSpeed, userId } = req.body;
   if (!videoPath || !subtitles || !Array.isArray(subtitles)) {
     return res.status(400).json({ error: 'videoPath and subtitles array are required' });
   }
 
   if (!fs.existsSync(videoPath)) {
     return res.status(404).json({ error: 'Không tìm thấy tệp video gốc trên máy chủ (có thể server vừa được deploy lại). Vui lòng tải video lên lại và làm lại từ đầu.' });
+  }
+
+  let user = null;
+  if (userId && mongoose.connection.readyState === 1) {
+    try {
+      user = await User.findById(userId);
+      if (user) {
+        const used = user.videoExportUsed || 0;
+        const quota = user.videoExportQuota || 10;
+        if (used >= quota) {
+          return res.status(403).json({
+            error: `Bạn đã dùng hết lượt xuất video của gói hiện tại (đã dùng ${used}/${quota} lượt). Vui lòng nâng cấp lên gói Pro để có thêm 100 lượt!`
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[api/dub] User quota check error:', e.message);
+    }
+  }
+
+  // Increment usage count if user found
+  if (user) {
+    try {
+      user.videoExportUsed = (user.videoExportUsed || 0) + 1;
+      await user.save();
+      console.log(`[api/dub] User ${user.username} export count updated: ${user.videoExportUsed}/${user.videoExportQuota}`);
+    } catch (saveError) {
+      console.error('[api/dub] Failed to save user export count increment:', saveError.message);
+    }
   }
 
   const exportId = uuidv4();

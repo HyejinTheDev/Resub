@@ -14,12 +14,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ResendOtpRequestedEvent>(_onResendOtpRequested);
     on<GoogleLoginRequestedEvent>(_onGoogleLoginRequested);
     on<LogoutRequestedEvent>(_onLogoutRequested);
+    on<RefreshProfileEvent>(_onRefreshProfile);
+    on<UpgradeToProEvent>(_onUpgradeToPro);
   }
 
   Future<void> _onAppStarted(AppStartedEvent event, Emitter<AuthState> emit) async {
     try {
       final user = await authRepository.getCachedUser();
       if (user != null) {
+        // Sync profile state with server on startup
+        try {
+          final updatedUser = await authRepository.getUserProfile(user.id);
+          emit(Authenticated(updatedUser));
+          return;
+        } catch (_) {}
         emit(Authenticated(user));
       } else {
         emit(Unauthenticated());
@@ -102,5 +110,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     await authRepository.logout();
     emit(Unauthenticated());
+  }
+
+  Future<void> _onRefreshProfile(RefreshProfileEvent event, Emitter<AuthState> emit) async {
+    try {
+      final user = await authRepository.getUserProfile(event.userId);
+      emit(Authenticated(user));
+    } catch (_) {
+      // Keep existing state if refresh fails
+    }
+  }
+
+  Future<void> _onUpgradeToPro(UpgradeToProEvent event, Emitter<AuthState> emit) async {
+    emit(AuthLoading());
+    try {
+      final user = await authRepository.upgradeToPro(event.userId);
+      emit(Authenticated(user));
+    } catch (e) {
+      emit(AuthFailure(e.toString().replaceAll('Exception: ', '')));
+      final cachedUser = await authRepository.getCachedUser();
+      if (cachedUser != null) {
+        emit(Authenticated(cachedUser));
+      } else {
+        emit(Unauthenticated());
+      }
+    }
   }
 }
