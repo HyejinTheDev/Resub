@@ -544,84 +544,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                               ),
                             ] else ...[
-                              // Tab Selection (Login / Register)
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: InkWell(
-                                        onTap: isLoading
-                                            ? null
-                                            : () {
-                                                setState(() {
-                                                  _isLogin = true;
-                                                  _errorMessage = '';
-                                                  _successMessage = '';
-                                                });
-                                              },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: _isLogin ? AppColors.primary : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            'Đăng nhập',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: _isLogin ? Colors.black : Colors.white60,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: InkWell(
-                                        onTap: isLoading
-                                            ? null
-                                            : () {
-                                                setState(() {
-                                                  _isLogin = false;
-                                                  _errorMessage = '';
-                                                  _successMessage = '';
-                                                });
-                                              },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: !_isLogin ? AppColors.primary : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            'Đăng ký',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: !_isLogin ? Colors.black : Colors.white60,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-
                               // Username Input
                               _buildInputField(
-                                label: _isLogin ? 'Tên đăng nhập hoặc Email' : 'Tên đăng nhập',
+                                label: 'Tên đăng nhập hoặc Email',
                                 controller: _usernameController,
-                                hintText: _isLogin ? 'Tên tài khoản hoặc email của bạn' : 'Tên tài khoản của bạn',
+                                hintText: 'Tên tài khoản hoặc email của bạn',
                                 icon: Icons.person_outline,
                                 enabled: !isLoading,
                               ),
