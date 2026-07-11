@@ -39,6 +39,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
       _controller!.initialize().then((_) {
         // Restore background volume once successfully initialized
         _controller!.setVolume(state.bgVolume);
+        _controller!.setPlaybackSpeed(0.7); // Play 0.7x slower by default
         setState(() {});
         _controller!.addListener(_onPlayerUpdate);
       }).catchError((error) {
@@ -51,9 +52,10 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
   void _onPlayerUpdate() {
     if (_controller == null) return;
     
-    final currentMs = _controller!.value.position.inMilliseconds;
+    // Scale playback position to fit virtual 1.0x workspace timeline
+    final currentMs = (_controller!.value.position.inMilliseconds * 0.7).round();
     final isPlaying = _controller!.value.isPlaying;
-    final durationMs = _controller!.value.duration.inMilliseconds.toDouble();
+    final durationMs = _controller!.value.duration.inMilliseconds.toDouble() * 0.7;
 
     context.read<WorkspaceBloc>().add(
       UpdatePlaybackProgressEvent(
@@ -144,7 +146,9 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
           current.seekRequestMs != previous.seekRequestMs,
       listener: (context, state) {
         if (state.seekRequestMs != null) {
-          _controller!.seekTo(Duration(milliseconds: state.seekRequestMs!));
+          // Scale seek target up to account for 0.7x playback speed
+          final scaledSeek = (state.seekRequestMs! / 0.7).round();
+          _controller!.seekTo(Duration(milliseconds: scaledSeek));
           context.read<WorkspaceBloc>().add(ClearSeekRequestEvent());
         }
       },

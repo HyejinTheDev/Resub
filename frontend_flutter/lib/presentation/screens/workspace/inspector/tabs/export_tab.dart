@@ -24,7 +24,7 @@ class _ExportTabState extends State<ExportTab> {
   String _quality = 'medium'; // low, medium, high
   String _resolution = '720'; // 1080, 720, 480
   bool _burnSubtitles = true;
-  double _videoSpeed = 1.0;
+  double _videoSpeed = 0.7;
 
   // Local Export State
   bool _isExporting = false;
@@ -289,9 +289,8 @@ class _ExportTabState extends State<ExportTab> {
               ),
               const SizedBox(height: 16),
 
-              // Video Speed dropdown
               DropdownButtonFormField<double>(
-                initialValue: _videoSpeed,
+                value: _videoSpeed,
                 style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Tốc độ video thành phẩm (Giãn lồng tiếng)',
@@ -299,9 +298,9 @@ class _ExportTabState extends State<ExportTab> {
                 dropdownColor: AppColors.surface,
                 items: const [
                   DropdownMenuItem(value: 1.0, child: Text('1.0x (Tốc độ gốc - bình thường)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.9091, child: Text('0.91x (Chậm đi 10% - Dễ lồng tiếng)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.8333, child: Text('0.83x (Chậm đi 20% - Giọng chuẩn 1.0x)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.7692, child: Text('0.77x (Chậm đi 30% - Thích hợp nhất)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.9, child: Text('0.9x (Chậm đi 10% - Dễ lồng tiếng)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.8, child: Text('0.8x (Chậm đi 20%)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(value: 0.7, child: Text('0.7x (Chậm đi 30% - Mặc định)', style: TextStyle(color: Colors.white))),
                 ],
                 onChanged: _isExporting
                     ? null
