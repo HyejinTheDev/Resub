@@ -22,9 +22,6 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<AddSubtitleEvent>(_onAddSubtitle);
     on<DeleteSubtitleEvent>(_onDeleteSubtitle);
     on<BulkVoiceChangeEvent>(_onBulkVoiceChange);
-    on<UpdateProjectVideoDataEvent>((event, emit) {
-      emit(state.copyWith(videoData: event.videoData));
-    });
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {

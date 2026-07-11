@@ -182,12 +182,3 @@ class RequestSeekEvent extends WorkspaceEvent {
 }
 
 class ClearSeekRequestEvent extends WorkspaceEvent {}
-
-class UpdateProjectVideoDataEvent extends WorkspaceEvent {
-  final Map<String, dynamic> videoData;
-
-  const UpdateProjectVideoDataEvent(this.videoData);
-
-  @override
-  List<Object?> get props => [videoData];
-}
