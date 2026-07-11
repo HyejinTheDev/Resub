@@ -205,7 +205,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
       final GoogleSignIn googleSignIn = GoogleSignIn(
         clientId: clientId,
-        scopes: ['email', 'profile'],
       );
       
       final GoogleSignInAccount? account = await googleSignIn.signIn();
