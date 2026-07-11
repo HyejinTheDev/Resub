@@ -99,7 +99,6 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
       appBar: AppBar(
         title: const Text('RESUB — Auto Dubbing Dashboard'),
         actions: [
-          if (authState is Authenticated) ...[
             // Subscription Quota Display
             Center(
               child: Container(
@@ -145,10 +144,22 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
             const SizedBox(width: 8),
             
             // Upgrade Pro Button if Free
-            if (subscriptionTier == 'FREE' && userId != null) ...[
+            if (subscriptionTier == 'FREE') ...[
               Center(
                 child: TextButton.icon(
-                  onPressed: () => _showUpgradeDialog(context, userId!),
+                  onPressed: () {
+                    if (userId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng đăng nhập để nâng cấp gói PRO!'),
+                          backgroundColor: Colors.amber,
+                        ),
+                      );
+                      Navigator.of(context).pushNamed('/login');
+                    } else {
+                      _showUpgradeDialog(context, userId);
+                    }
+                  },
                   icon: const Icon(Icons.bolt, size: 14, color: AppColors.primary),
                   label: const Text(
                     'Nâng cấp PRO',
@@ -161,41 +172,62 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
             ],
-          ],
 
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.person, size: 14, color: AppColors.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      username,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+          if (authState is Authenticated) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        username,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent, size: 18),
-            tooltip: 'Đăng xuất',
-            onPressed: () {
-              context.read<AuthBloc>().add(LogoutRequestedEvent());
-            },
-          ),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.redAccent, size: 18),
+              tooltip: 'Đăng xuất',
+              onPressed: () {
+                context.read<AuthBloc>().add(LogoutRequestedEvent());
+              },
+            ),
+          ] else ...[
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pushNamed('/login');
+                  },
+                  icon: const Icon(Icons.login_rounded, size: 14, color: Colors.black),
+                  label: const Text(
+                    'Đăng nhập',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
         ],
       ),

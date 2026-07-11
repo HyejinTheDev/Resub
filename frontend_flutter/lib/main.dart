@@ -20,6 +20,7 @@ import 'presentation/screens/auth/auth_screen.dart';
 import 'presentation/screens/dashboard/project_dashboard_screen.dart';
 import 'presentation/screens/workspace/workspace_screen.dart';
 import 'presentation/screens/workspace/player/platform_view_helper.dart';
+import 'presentation/screens/landing/landing_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,21 +86,20 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.darkTheme,
           initialRoute: '/',
           routes: {
-            '/': (context) => BlocBuilder<AuthBloc, AuthState>(
+            '/': (context) => const LandingScreen(),
+            '/dashboard': (context) => BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, state) {
-                    if (state is Authenticated) {
-                      return const ProjectDashboardScreen();
-                    } else if (state is AuthLoading) {
+                    if (state is AuthLoading) {
                       return const Scaffold(
                         body: Center(
                           child: CircularProgressIndicator(color: AppColors.primary),
                         ),
                       );
-                    } else {
-                      return const AuthScreen();
                     }
+                    return const ProjectDashboardScreen();
                   },
                 ),
+            '/login': (context) => const AuthScreen(),
             '/workspace': (context) => const WorkspaceScreen(),
           },
         ),

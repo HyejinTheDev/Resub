@@ -293,7 +293,9 @@ class _AuthScreenState extends State<AuthScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
               child: BlocConsumer<AuthBloc, AuthState>(
                 listener: (context, state) {
-                  if (state is AuthFailure) {
+                  if (state is Authenticated) {
+                    Navigator.of(context).pop();
+                  } else if (state is AuthFailure) {
                     setState(() {
                       _errorMessage = state.error;
                       _successMessage = '';
