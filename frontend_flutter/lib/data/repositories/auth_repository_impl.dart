@@ -151,12 +151,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<String> createPaymentLink(String userId) async {
+  Future<Map<String, dynamic>> createPaymentLink(String userId) async {
     final result = await apiClient.createPaymentLink(userId);
-    if (result['checkoutUrl'] != null) {
-      return result['checkoutUrl'].toString();
-    }
-    throw Exception(result['error'] ?? 'Không thể khởi tạo liên kết thanh toán');
+    return result;
   }
 
 

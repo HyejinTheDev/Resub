@@ -510,6 +510,7 @@ class _ExportTabState extends State<ExportTab> {
     final authRepository = RepositoryProvider.of<AuthRepository>(context);
     bool isGeneratingLink = false;
     Timer? checkPaymentTimer;
+    Map<String, dynamic>? activePaymentData;
 
     showDialog(
       context: context,
@@ -604,11 +605,15 @@ class _ExportTabState extends State<ExportTab> {
                                             isGeneratingLink = true;
                                           });
                                           try {
-                                            final checkoutUrl = await authRepository.createPaymentLink(userId);
-                                            await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+                                             final result = await authRepository.createPaymentLink(userId);
+                                             final checkoutUrl = result['checkoutUrl']?.toString() ?? '';
+                                             if (checkoutUrl.isNotEmpty) {
+                                               await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+                                             }
                                             
                                             // Start polling for payment success
                                             setDialogState(() {
+                                              activePaymentData = result;
                                               isGeneratingLink = false;
                                               checkPaymentTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
                                                 if (mounted) {
@@ -649,23 +654,53 @@ class _ExportTabState extends State<ExportTab> {
                             ],
                           ),
                         ] else ...[
-                          const SizedBox(height: 10),
-                          const SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: CircularProgressIndicator(strokeWidth: 3.5, color: AppColors.primary),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'Đang Chờ Chuyển Khoản...',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Vui lòng quét mã VietQR trên trang thanh toán PayOS vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
-                          ),
+                          if (activePaymentData != null &&
+                              activePaymentData!['bankId'] != null &&
+                              activePaymentData!['accountNo'] != null &&
+                              activePaymentData!['accountName'] != null) ...[
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Image.network(
+                                'https://img.vietqr.io/image/${activePaymentData!['bankId']}-${activePaymentData!['accountNo']}-qr_only.png?amount=${activePaymentData!['amount']}&addInfo=RSB%20${activePaymentData!['orderCode']}&accountName=${Uri.encodeComponent(activePaymentData!['accountName'].toString())}',
+                                width: 220,
+                                height: 220,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Đang Chờ Chuyển Khoản...',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Vui lòng quét mã VietQR ở trên để chuyển khoản 199.000đ.\n\nNội dung chuyển khoản: RSB ${activePaymentData!['orderCode']}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 10),
+                            const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(strokeWidth: 3.5, color: AppColors.primary),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Đang Chờ Chuyển Khoản...',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Vui lòng quét mã VietQR trên trang thanh toán vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                            ),
+                          ],
                           const SizedBox(height: 28),
                           OutlinedButton(
                             onPressed: () {

@@ -558,11 +558,18 @@ router.post('/payment/create-link', async (req, res) => {
       const publicBase = getPublicBaseUrl(req);
       const checkoutUrl = `${publicBase}/payment/checkout/${orderCode}`;
 
+      const bankId = process.env.BANK_ID || 'MB';
+      const accountNo = process.env.BANK_ACCOUNT || '0999999999';
+      const accountName = process.env.BANK_NAME || 'NGUYEN CONG HIEP';
+
       return res.json({
         success: true,
         checkoutUrl,
         orderCode,
-        amount
+        amount,
+        bankId,
+        accountNo,
+        accountName
       });
     } catch (error) {
       console.error('[payment/create-link] SePay Fallback Error:', error.message);
