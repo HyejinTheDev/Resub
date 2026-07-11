@@ -12,6 +12,9 @@ if (EMAIL_USER && EMAIL_PASS) {
       user: EMAIL_USER,
       pass: EMAIL_PASS,
     },
+    connectionTimeout: 3000, // 3 seconds
+    greetingTimeout: 3000,
+    socketTimeout: 5000,
   });
 } else {
   console.warn('⚠️ WARNING: EMAIL_USER and EMAIL_PASS are not configured in .env. Email OTP service is inactive.');

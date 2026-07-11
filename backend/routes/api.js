@@ -105,14 +105,22 @@ router.post('/auth/register', async (req, res) => {
 
     await newUser.save();
 
-    const mailSent = await sendOtpEmail(email, otpCode);
+    let mailSent = false;
+    try {
+      mailSent = await sendOtpEmail(email, otpCode);
+    } catch (_) {}
+
     if (!mailSent) {
-      console.log(`[Demo/Testing Fallback] Email SMTP not configured. OTP Code for ${email} is: ${otpCode}`);
+      console.log(`[Demo/Testing Fallback] Email SMTP failed or blocked. OTP Code for ${email} set to fallback: 123456`);
+      newUser.otpCode = '123456';
+      await newUser.save();
     }
 
     res.json({
       success: true,
-      message: 'Mã xác thực OTP đã được gửi tới email của bạn!',
+      message: mailSent
+        ? 'Mã xác thực OTP đã được gửi tới email của bạn!'
+        : 'Hệ thống gửi Email bị chặn (Hugging Face). Vui lòng nhập mã OTP thử nghiệm: 123456',
       email: email,
       otpPending: true
     });
@@ -200,14 +208,22 @@ router.post('/auth/resend-otp', async (req, res) => {
     user.otpExpires = otpExpires;
     await user.save();
 
-    const mailSent = await sendOtpEmail(email, otpCode);
+    let mailSent = false;
+    try {
+      mailSent = await sendOtpEmail(email, otpCode);
+    } catch (_) {}
+
     if (!mailSent) {
-      console.log(`[Demo/Testing Fallback] Email SMTP not configured. Re-sent OTP Code for ${email} is: ${otpCode}`);
+      console.log(`[Demo/Testing Fallback] Email SMTP failed or blocked. Re-sent OTP Code for ${email} set to fallback: 123456`);
+      user.otpCode = '123456';
+      await user.save();
     }
 
     res.json({
       success: true,
-      message: 'Mã OTP mới đã được gửi lại vào email của bạn!'
+      message: mailSent
+        ? 'Mã OTP mới đã được gửi lại vào email của bạn!'
+        : 'Hệ thống gửi Email bị chặn (Hugging Face). Vui lòng nhập mã OTP thử nghiệm: 123456'
     });
   } catch (error) {
     console.error('[auth/resend-otp] Error:', error.message);
