@@ -350,21 +350,40 @@ router.post('/auth/google', async (req, res) => {
 
   const { credential } = req.body;
   if (!credential) {
-    return res.status(400).json({ error: 'ID Token (credential) is required' });
+    return res.status(400).json({ error: 'ID Token or Access Token (credential) is required' });
   }
 
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: GOOGLE_CLIENT_ID
-    });
+    let email, name, picture;
 
-    const payload = ticket.getPayload();
-    if (!payload) {
-      return res.status(400).json({ error: 'Invalid token payload' });
+    // Detect if JWT (ID Token) or normal string (Access Token)
+    const isJwt = credential.includes('.') && credential.split('.').length === 3;
+
+    if (isJwt) {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: GOOGLE_CLIENT_ID
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(400).json({ error: 'Invalid token payload' });
+      }
+      email = payload.email;
+      name = payload.name;
+      picture = payload.picture;
+    } else {
+      // Treat credential as Google OAuth2 Access Token and fetch user profile via Userinfo API
+      const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${credential}`);
+      if (!response.ok) {
+        return res.status(400).json({ error: 'Failed to verify Google access token' });
+      }
+      const data = await response.json();
+      email = data.email;
+      name = data.name;
+      picture = data.picture;
     }
 
-    const { email, name, picture } = payload;
     if (!email) {
       return res.status(400).json({ error: 'Email not provided by Google' });
     }

@@ -211,12 +211,15 @@ class _AuthScreenState extends State<AuthScreen> {
       if (account != null) {
         final GoogleSignInAuthentication auth = await account.authentication;
         final String? idToken = auth.idToken;
-        if (idToken != null) {
+        final String? accessToken = auth.accessToken;
+        final String? tokenToUse = idToken ?? accessToken;
+        
+        if (tokenToUse != null) {
           if (mounted) {
-            context.read<AuthBloc>().add(GoogleLoginRequestedEvent(credential: idToken));
+            context.read<AuthBloc>().add(GoogleLoginRequestedEvent(credential: tokenToUse));
           }
         } else {
-          throw Exception('Không lấy được ID Token từ Google!');
+          throw Exception('Không lấy được mã xác thực (ID Token/Access Token) từ Google!');
         }
       }
     } catch (e) {
