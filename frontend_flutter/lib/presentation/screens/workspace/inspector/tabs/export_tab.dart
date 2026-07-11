@@ -289,30 +289,7 @@ class _ExportTabState extends State<ExportTab> {
               ),
               const SizedBox(height: 16),
 
-              DropdownButtonFormField<double>(
-                value: _videoSpeed,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: 'Tốc độ video thành phẩm (Giãn lồng tiếng)',
-                ),
-                dropdownColor: AppColors.surface,
-                items: const [
-                  DropdownMenuItem(value: 1.0, child: Text('1.0x (Tốc độ gốc - bình thường)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.9, child: Text('0.9x (Chậm đi 10% - Dễ lồng tiếng)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.8, child: Text('0.8x (Chậm đi 20%)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 0.7, child: Text('0.7x (Chậm đi 30% - Mặc định)', style: TextStyle(color: Colors.white))),
-                ],
-                onChanged: _isExporting
-                    ? null
-                    : (val) {
-                        if (val != null) {
-                          setState(() {
-                            _videoSpeed = val;
-                          });
-                        }
-                      },
-              ),
-              const SizedBox(height: 16),
+
 
               // Burn subtitles toggle
               Row(
