@@ -102,12 +102,64 @@ class _AuthScreenState extends State<AuthScreen> {
             password: password,
           ));
     } else {
-      context.read<AuthBloc>().add(RegisterRequestedEvent(
-            username: username,
-            email: email,
-            password: password,
-          ));
+      _showRegistrationUnavailableDialog();
     }
+  }
+
+  void _showRegistrationUnavailableDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E202C),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF2D3748)),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Thông báo',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Tính năng đăng ký tài khoản mới bằng Email hiện đang tạm đóng để nâng cấp hệ thống xác thực. \n\nVui lòng sử dụng phương thức "Đăng nhập bằng Google" ở góc dưới màn hình để đăng ký và trải nghiệm dịch vụ ngay lập tức!',
+            style: TextStyle(
+              color: Color(0xFFA0AEC0),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _isLogin = true;
+                });
+              },
+              child: const Text(
+                'Đã hiểu & Đăng nhập bằng Google',
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _submitOtp() {
