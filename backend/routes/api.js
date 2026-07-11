@@ -536,8 +536,38 @@ router.post('/payment/create-link', async (req, res) => {
     return res.status(400).json({ error: 'userId is required' });
   }
 
+  // If PayOS is not configured, fallback to SePay checkout mode
   if (!payos) {
-    return res.status(503).json({ error: 'Cổng thanh toán PayOS chưa được cấu hình! Vui lòng thiết lập các khóa PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY trong file .env.' });
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'Người dùng không tồn tại' });
+      }
+
+      const amount = 199000;
+      const orderCode = Math.floor(100000 + Math.random() * 900000) + Math.floor(Date.now() / 100000) * 10;
+
+      const payment = new Payment({
+        userId: user._id,
+        orderCode,
+        amount,
+        status: 'pending'
+      });
+      await payment.save();
+
+      const publicBase = getPublicBaseUrl(req);
+      const checkoutUrl = `${publicBase}/payment/checkout/${orderCode}`;
+
+      return res.json({
+        success: true,
+        checkoutUrl,
+        orderCode,
+        amount
+      });
+    } catch (error) {
+      console.error('[payment/create-link] SePay Fallback Error:', error.message);
+      return res.status(500).json({ error: 'Lỗi tạo liên kết thanh toán SePay: ' + error.message });
+    }
   }
 
   try {
@@ -642,6 +672,324 @@ router.post('/payment/payos-webhook', async (req, res) => {
   } catch (error) {
     console.error('[PayOS Webhook Error]:', error.message);
     res.status(400).json({ error: 'Lỗi xác minh Webhook: ' + error.message });
+  }
+});
+
+// ==========================================
+// SEPAY PAYMENT GATEWAY INTEGRATION
+// ==========================================
+
+// SePay Webhook receiver
+router.post('/payment/sepay-webhook', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const expectedToken = process.env.SEPAY_API_KEY;
+
+  if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+    return res.status(401).json({ error: 'Unauthorized webhook call' });
+  }
+
+  const { content, transferAmount, transferType } = req.body;
+  console.log('[SePay Webhook] Received notification:', JSON.stringify(req.body));
+
+  if (transferType !== 'in') {
+    return res.json({ success: true, message: 'Ignore outbound transaction' });
+  }
+
+  try {
+    // Find orderCode from content (memo) matching RSB\s*(\d+)
+    const match = content ? content.toUpperCase().match(/RSB\s*(\d+)/) : null;
+    if (!match) {
+      console.warn(`[SePay Webhook] Could not find orderCode in transaction content: ${content}`);
+      return res.status(400).json({ error: 'Không tìm thấy mã đơn hàng trong nội dung chuyển khoản' });
+    }
+
+    const orderCode = parseInt(match[1]);
+    const payment = await Payment.findOne({ orderCode });
+    if (!payment) {
+      console.warn(`[SePay Webhook] Transaction not found for orderCode: ${orderCode}`);
+      return res.status(404).json({ error: 'Không tìm thấy giao dịch chuyển khoản' });
+    }
+
+    if (payment.status === 'completed') {
+      console.log(`[SePay Webhook] Transaction ${orderCode} was already completed.`);
+      return res.json({ success: true, message: 'Giao dịch đã được xử lý.' });
+    }
+
+    // Update status
+    payment.status = 'completed';
+    await payment.save();
+
+    // Upgrade user
+    const user = await User.findById(payment.userId);
+    if (user) {
+      user.subscriptionTier = 'pro';
+      user.videoExportQuota = 100;
+      await user.save();
+      console.log(`[SePay Webhook] Successfully upgraded user ${user.username} to PRO via SePay.`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Xác nhận thanh toán và nâng cấp gói PRO thành công!'
+    });
+  } catch (error) {
+    console.error('[SePay Webhook Error]:', error.message);
+    res.status(500).json({ error: 'Lỗi xác minh Webhook SePay: ' + error.message });
+  }
+});
+
+// Payment status check endpoint
+router.get('/api/payment/status/:orderCode', async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+    const payment = await Payment.findOne({ orderCode: parseInt(orderCode) });
+    if (!payment) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.json({ status: payment.status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Render dynamic VietQR checkout page for SePay
+router.get('/payment/checkout/:orderCode', async (req, res) => {
+  try {
+    const { orderCode } = req.params;
+    const payment = await Payment.findOne({ orderCode: parseInt(orderCode) });
+    if (!payment) {
+      return res.status(404).send('Không tìm thấy giao dịch thanh toán.');
+    }
+
+    const bankId = process.env.BANK_ID || 'MB';
+    const accountNo = process.env.BANK_ACCOUNT || '0999999999';
+    const accountName = process.env.BANK_NAME || 'NGUYEN CONG HIEP';
+    const amount = payment.amount;
+    const memo = `RSB ${orderCode}`;
+
+    // VietQR image URL
+    const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-qr_only.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accountName)}`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thanh Toán Nâng Cấp Gói PRO</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0c0d14;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: radial-gradient(circle at center, #1e202c 0%, #0c0d14 100%);
+      border: 1px solid #2d3748;
+      border-radius: 16px;
+      padding: 30px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 20px;
+    }
+    .qr-container {
+      background-color: white;
+      padding: 15px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    .qr-image {
+      width: 260px;
+      height: 260px;
+      display: block;
+    }
+    .status-text {
+      font-size: 14px;
+      color: #a0aec0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 25px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #10b981;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .details-list {
+      text-align: left;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 25px;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .detail-row:last-child {
+      margin-bottom: 0;
+    }
+    .label {
+      color: #718096;
+    }
+    .value {
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .copy-btn {
+      background: none;
+      border: none;
+      color: #10b981;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      transition: all 0.2s;
+    }
+    .copy-btn:hover {
+      background: rgba(16, 185, 129, 0.1);
+    }
+    .success-screen {
+      display: none;
+    }
+    .success-icon {
+      font-size: 64px;
+      color: #10b981;
+      margin-bottom: 20px;
+      animation: scaleIn 0.5s ease-out;
+    }
+    @keyframes scaleIn {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="paymentCard">
+    <div class="logo">RESUB PRO</div>
+    
+    <div class="qr-container">
+      <img src="${qrUrl}" alt="VietQR" class="qr-image">
+    </div>
+    
+    <div class="status-text">
+      <div class="status-dot"></div>
+      <span>Đang chờ chuyển khoản...</span>
+    </div>
+    
+    <div class="details-list">
+      <div class="detail-row">
+        <span class="label">Ngân hàng:</span>
+        <span class="value">${bankId}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Số tài khoản:</span>
+        <span class="value">
+          ${accountNo}
+          <button class="copy-btn" onclick="copyText('${accountNo}', this)">Copy</button>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Chủ tài khoản:</span>
+        <span class="value">${accountName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Số tiền:</span>
+        <span class="value">
+          ${amount.toLocaleString('vi-VN')} đ
+          <button class="copy-btn" onclick="copyText('${amount}', this)">Copy</button>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Nội dung chuyển:</span>
+        <span class="value" style="color: #f59e0b;">
+          ${memo}
+          <button class="copy-btn" style="color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);" onclick="copyText('${memo}', this)">Copy</button>
+        </span>
+      </div>
+    </div>
+    <div style="font-size: 11px; color: #718096; line-height: 1.4;">
+      Vui lòng quét mã QR hoặc chuyển khoản đúng số tài khoản và <strong>nội dung chuyển</strong> bên trên để được kích hoạt tự động.
+    </div>
+  </div>
+
+  <div class="card success-screen" id="successCard">
+    <div class="success-icon">✓</div>
+    <h2 style="color: white; margin-bottom: 10px;">Thanh Toán Thành Công!</h2>
+    <p style="color: #a0aec0; font-size: 14px; line-height: 1.6; margin-bottom: 30px;">
+      Tài khoản của bạn đã được nâng cấp lên gói <strong>PRO</strong> thành công với 100 lượt xuất video chất lượng cao!
+    </p>
+    <div style="font-size: 12px; color: #718096;">
+      Bạn có thể đóng cửa sổ này và tiếp tục sử dụng ứng dụng.
+    </div>
+  </div>
+
+  <script>
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        setTimeout(() => { btn.innerText = originalText; }, 1500);
+      });
+    }
+
+    // Poll status every 2 seconds
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/payment/status/' + '${orderCode}');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'completed') {
+            clearInterval(interval);
+            document.getElementById('paymentCard').style.display = 'none';
+            document.getElementById('successCard').style.display = 'block';
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
+    `;
+
+    res.send(html);
+  } catch (error) {
+    res.status(500).send('Lỗi tải trang thanh toán: ' + error.message);
   }
 });
 
