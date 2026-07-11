@@ -167,18 +167,19 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
         return Column(
           children: [
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    color: Colors.black,
-              child: Stack(
+              child: Container(
+                color: Colors.black,
                 alignment: Alignment.center,
-                children: [
-                  // 1. Video Player
-                  AspectRatio(
-                    aspectRatio: _controller!.value.aspectRatio,
-                    child: VideoPlayer(_controller!),
-                  ),
+                child: AspectRatio(
+                  aspectRatio: _controller!.value.aspectRatio,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Stack(
+                        children: [
+                          // 1. Video Player
+                          Positioned.fill(
+                            child: VideoPlayer(_controller!),
+                          ),
 
                   // 2. Snapping Guideline (Horizontal line at 50% Y coordinate)
                   if (showSnappingGuide)
@@ -316,41 +317,41 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                   // 4. Subtitle Overlay (Draggable widget)
                   if (hasActiveSubtitle)
                     Positioned(
-                      top: constraints.maxHeight * (currentY / 100) - 20,
-                      left: 20,
-                      right: 20,
-                      child: GestureDetector(
-                        onVerticalDragStart: (_) {
-                          setState(() {
-                            _isDraggingSubtitle = true;
-                            _dragYPercent = state.subtitleYPercent;
-                          });
-                        },
-                        onVerticalDragUpdate: (details) {
-                          setState(() {
-                            // Convert delta dy to percentage
-                            final deltaYPercent = (details.primaryDelta! / constraints.maxHeight) * 100;
-                            var newY = _dragYPercent + deltaYPercent;
-                            newY = newY.clamp(10.0, 95.0);
-                            
-                            // Snapping logic: if within 2% of 50%, snap to exactly 50%
-                            if ((newY - 50.0).abs() < 2.0) {
-                              newY = 50.0;
-                            }
-                            
-                            _dragYPercent = newY;
-                          });
-                        },
-                        onVerticalDragEnd: (_) {
-                          setState(() {
-                            _isDraggingSubtitle = false;
-                          });
-                          context.read<WorkspaceBloc>().add(
-                            UpdateSubtitleStyleEvent(yPercent: _dragYPercent),
-                          );
-                        },
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                      top: constraints.maxHeight * (currentY / 100),
+                      left: constraints.maxWidth * 0.1,
+                      right: constraints.maxWidth * 0.1,
+                      child: FractionalTranslation(
+                        translation: const Offset(0.0, -0.5),
+                        child: GestureDetector(
+                          onVerticalDragStart: (_) {
+                            setState(() {
+                              _isDraggingSubtitle = true;
+                              _dragYPercent = state.subtitleYPercent;
+                            });
+                          },
+                          onVerticalDragUpdate: (details) {
+                            setState(() {
+                              // Convert delta dy to percentage
+                              final deltaYPercent = (details.primaryDelta! / constraints.maxHeight) * 100;
+                              var newY = _dragYPercent + deltaYPercent;
+                              newY = newY.clamp(10.0, 95.0);
+                              
+                              // Snapping logic: if within 2% of 50%, snap to exactly 50%
+                              if ((newY - 50.0).abs() < 2.0) {
+                                newY = 50.0;
+                              }
+                              
+                              _dragYPercent = newY;
+                            });
+                          },
+                          onVerticalDragEnd: (_) {
+                            setState(() {
+                              _isDraggingSubtitle = false;
+                            });
+                            context.read<WorkspaceBloc>().add(
+                              UpdateSubtitleStyleEvent(yPercent: _dragYPercent),
+                            );
+                          },
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
@@ -358,7 +359,6 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                               Text(
                                 activeSub.text,
                                 textAlign: TextAlign.center,
-                                maxLines: 1,
                                 style: TextStyle(
                                   fontSize: state.subtitleFontSize * 1.5,
                                   fontWeight: FontWeight.bold,
@@ -372,7 +372,6 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                               Text(
                                 activeSub.text,
                                 textAlign: TextAlign.center,
-                                maxLines: 1,
                                 style: TextStyle(
                                   color: _colorFromHex(state.subtitleColor),
                                   fontSize: state.subtitleFontSize * 1.5,
@@ -385,11 +384,12 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                       ),
                     ),
 
-                ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
-            );
-          },
-        ),
             ),
             // 5. Playback Controller Buttons (placed below the video area)
             Container(
