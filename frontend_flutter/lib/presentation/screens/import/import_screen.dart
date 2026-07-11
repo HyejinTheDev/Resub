@@ -444,7 +444,7 @@ class _ImportScreenState extends State<ImportScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Tự động lắng nghe giọng nói tiếng Trung trong tệp video của bạn, dịch thuật sang tiếng Việt bằng Gemini AI và khởi tạo dự án lồng tiếng đồng bộ.',
+              'Tự động nhận dạng tiếng nói trong tệp video của bạn, dịch thuật sang tiếng Việt bằng công nghệ AI tiên tiến và khởi tạo dự án lồng tiếng đồng bộ.',
               style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
             ),
             const SizedBox(height: 24),
@@ -577,7 +577,7 @@ class _ImportScreenState extends State<ImportScreen> {
         if (!_useSystemPool) ...[
           const SizedBox(height: 12),
           const Text(
-            'Nhập API Key Gemini của bạn:',
+            'Nhập API Key AI của bạn:',
             style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),

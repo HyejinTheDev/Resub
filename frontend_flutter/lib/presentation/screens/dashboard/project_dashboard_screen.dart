@@ -654,7 +654,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Vui lòng quét mã VietQR ở trên để chuyển khoản 199.000đ.\n\nNội dung chuyển khoản: RSB ${activePaymentData!['orderCode']}',
+                              'Vui lòng quét mã QR ở trên để chuyển khoản 199.000đ.\n\nNội dung chuyển khoản: RSB ${activePaymentData!['orderCode']}',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
                             ),
@@ -672,7 +672,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Vui lòng quét mã VietQR trên trang thanh toán vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
+                              'Vui lòng quét mã QR trên trang thanh toán vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
                             ),

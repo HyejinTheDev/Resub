@@ -909,7 +909,7 @@ router.get('/payment/checkout/:orderCode', async (req, res) => {
     <div class="logo">RESUB PRO</div>
     
     <div class="qr-container">
-      <img src="${qrUrl}" alt="VietQR" class="qr-image">
+      <img src="${qrUrl}" alt="Mã QR" class="qr-image">
     </div>
     
     <div class="status-text">

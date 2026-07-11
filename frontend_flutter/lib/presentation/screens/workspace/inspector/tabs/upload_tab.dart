@@ -215,7 +215,7 @@ class _UploadTabState extends State<UploadTab> {
         if (!_useSystemPool) ...[
           const SizedBox(height: 12),
           const Text(
-            'Nhập API Key Gemini:',
+            'Nhập API Key AI:',
             style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
