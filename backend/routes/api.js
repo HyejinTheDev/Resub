@@ -111,16 +111,30 @@ router.post('/auth/register', async (req, res) => {
     } catch (_) {}
 
     if (!mailSent) {
-      console.log(`[Demo/Testing Fallback] Email SMTP failed or blocked. OTP Code for ${email} set to fallback: 123456`);
-      newUser.otpCode = '123456';
-      await newUser.save();
+      const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+      if (isLocalhost) {
+        console.log(`[Dev Fallback] Localhost detected. Email SMTP failed. Setting fallback OTP: 123456`);
+        newUser.otpCode = '123456';
+        await newUser.save();
+        
+        return res.json({
+          success: true,
+          message: 'Hệ thống gửi Email cục bộ không khả dụng. Vui lòng nhập mã OTP thử nghiệm: 123456',
+          email: email,
+          otpPending: true
+        });
+      } else {
+        // Security block on production: Clean up user entry and return error
+        await User.deleteOne({ _id: newUser._id });
+        return res.status(500).json({ 
+          error: 'Hệ thống gửi email xác thực hiện tại không khả dụng. Vui lòng sử dụng phương thức "Đăng nhập bằng Google" để đăng ký tài khoản nhanh chóng và bảo mật!' 
+        });
+      }
     }
 
     res.json({
       success: true,
-      message: mailSent
-        ? 'Mã xác thực OTP đã được gửi tới email của bạn!'
-        : 'Hệ thống gửi Email bị chặn (Hugging Face). Vui lòng nhập mã OTP thử nghiệm: 123456',
+      message: 'Mã xác thực OTP đã được gửi tới email của bạn!',
       email: email,
       otpPending: true
     });
@@ -214,16 +228,26 @@ router.post('/auth/resend-otp', async (req, res) => {
     } catch (_) {}
 
     if (!mailSent) {
-      console.log(`[Demo/Testing Fallback] Email SMTP failed or blocked. Re-sent OTP Code for ${email} set to fallback: 123456`);
-      user.otpCode = '123456';
-      await user.save();
+      const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+      if (isLocalhost) {
+        console.log(`[Dev Fallback] Localhost detected. Email SMTP failed. Setting fallback OTP: 123456`);
+        user.otpCode = '123456';
+        await user.save();
+        
+        return res.json({
+          success: true,
+          message: 'Hệ thống gửi Email cục bộ không khả dụng. Vui lòng nhập mã OTP thử nghiệm: 123456'
+        });
+      } else {
+        return res.status(500).json({ 
+          error: 'Hệ thống gửi email xác thực hiện tại không khả dụng. Vui lòng sử dụng phương thức "Đăng nhập bằng Google" để đăng ký tài khoản nhanh chóng và bảo mật!' 
+        });
+      }
     }
 
     res.json({
       success: true,
-      message: mailSent
-        ? 'Mã OTP mới đã được gửi lại vào email của bạn!'
-        : 'Hệ thống gửi Email bị chặn (Hugging Face). Vui lòng nhập mã OTP thử nghiệm: 123456'
+      message: 'Mã OTP mới đã được gửi lại vào email của bạn!'
     });
   } catch (error) {
     console.error('[auth/resend-otp] Error:', error.message);
