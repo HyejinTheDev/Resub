@@ -78,6 +78,79 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
     );
   }
 
+  void _createNewRoomDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tạo phòng trống mới'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Nhập tên phòng (ví dụ: Phòng dịch 01)...',
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              final roomName = controller.text.trim();
+              if (roomName.isNotEmpty) {
+                final projId = 'project-${DateTime.now().millisecondsSinceEpoch}';
+                final project = ProjectModel(
+                  id: projId,
+                  name: roomName,
+                  createdAt: DateTime.now().millisecondsSinceEpoch,
+                  updatedAt: DateTime.now().millisecondsSinceEpoch,
+                  subtitles: const [],
+                  blurMasks: const [],
+                  subtitleStyle: const {
+                    'fontSize': 10.0,
+                    'yPercent': 85.0,
+                    'color': '#EAB308',
+                    'outlineColor': '#000000',
+                  },
+                  cropStyle: const {},
+                  videoTransform: const {},
+                  videoData: {
+                    'projectId': projId,
+                    'projectName': roomName,
+                    'videoUrl': '',
+                  },
+                );
+
+                // Save to local storage
+                context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));
+                
+                // Initialize in Workspace
+                context.read<WorkspaceBloc>().add(LoadProjectWorkspaceEvent(project));
+                
+                // Close dialog
+                Navigator.pop(context);
+                
+                // Redirect to Workspace
+                Navigator.pushReplacementNamed(context, '/workspace');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng nhập tên phòng!'),
+                    backgroundColor: Colors.amber,
+                  ),
+                );
+              }
+            },
+            child: const Text('Tạo phòng', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
@@ -235,45 +308,47 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Embedded Import Card & Long Video Splitter
-            // Since ImportScreen is a Scaffold, we wrap it in a sized layout or directly render its core contents.
-            // But to make it clean, we render the original ImportScreen content in a container:
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: const SizedBox(
-                height: 520,
-                child: ImportScreen(),
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24.0),
-              child: Divider(color: AppColors.border, height: 40),
-            ),
-
-            // Projects Area
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Dự án của tôi',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Quản lý và tiếp tục biên tập các video lồng tiếng của bạn',
-                            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                          ),
-                        ],
+                  // Projects Area Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Phòng Biên Tập & Dự án',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Quản lý các phòng lồng tiếng và biên tập video của bạn',
+                        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+
+                  // Actions block: Create room & Search
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _createNewRoomDialog(context),
+                        icon: const Icon(Icons.add_box_rounded, size: 16, color: Colors.black),
+                        label: const Text(
+                          'Tạo phòng trống',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
 
                       // Search bar
                       SizedBox(
@@ -307,7 +382,9 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                ],
+              ),
+              const SizedBox(height: 24),
 
                   // Project List/Grid
                   BlocBuilder<ProjectBloc, ProjectState>(
