@@ -607,9 +607,9 @@ class _ExportTabState extends State<ExportTab> {
                                           try {
                                              final result = await authRepository.createPaymentLink(userId);
                                              final checkoutUrl = result['checkoutUrl']?.toString() ?? '';
-                                             if (checkoutUrl.isNotEmpty) {
-                                               await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
-                                             }
+                                              if (checkoutUrl.isNotEmpty && result['bankId'] == null) {
+                                                await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
+                                              }
                                             
                                             // Start polling for payment success
                                             setDialogState(() {

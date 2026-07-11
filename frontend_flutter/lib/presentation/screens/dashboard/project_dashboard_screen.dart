@@ -583,7 +583,7 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                                           try {
                                             final result = await authRepository.createPaymentLink(userId);
                                             final checkoutUrl = result['checkoutUrl']?.toString() ?? '';
-                                            if (checkoutUrl.isNotEmpty) {
+                                            if (checkoutUrl.isNotEmpty && result['bankId'] == null) {
                                               await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
                                             }
                                             
