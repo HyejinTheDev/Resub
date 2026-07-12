@@ -262,13 +262,15 @@ class _ImportScreenState extends State<ImportScreen> {
                 child: Center(
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: splitterCard),
-                        const SizedBox(width: 24),
-                        Expanded(child: importCard),
-                      ],
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: splitterCard),
+                          const SizedBox(width: 24),
+                          Expanded(child: importCard),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -498,59 +500,65 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Widget _buildImportCard(BuildContext context, ImportState state) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: const [
-                Icon(Icons.mic, color: AppColors.primary, size: 24),
-                SizedBox(width: 10),
-                Text(
-                  'Tải video & Dịch lồng tiếng',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Tạo một phòng làm việc (dự án) trống mới, sau đó bạn có thể tải video lên phòng đó và tùy chọn dịch thuật lồng tiếng bằng AI khi cần.',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
-            ),
-            const SizedBox(height: 32),
-            InkWell(
-              onTap: () => _createNewRoomDialog(context),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                height: 150,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF00C6FF), // Cyan
+            Color(0xFF0072FF), // Deep blue
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0072FF).withValues(alpha: 0.25),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _createNewRoomDialog(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border, style: BorderStyle.solid),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.white.withValues(alpha: 0.02),
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.add_box_rounded, size: 48, color: AppColors.primary),
-                    SizedBox(height: 12),
-                    Text(
-                      'Khởi tạo phòng trống mới',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Đặt tên và tạo phòng để tải video biên dịch',
-                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.add_box_rounded,
+                  size: 40,
+                  color: Colors.white,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              const Text(
+                'Tạo phòng lồng tiếng',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tạo dự án trống mới để lồng tiếng & dịch thuật',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

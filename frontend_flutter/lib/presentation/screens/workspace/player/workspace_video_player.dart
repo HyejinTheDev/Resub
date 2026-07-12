@@ -89,84 +89,139 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
     return Color(int.parse('FF$hexCode', radix: 16));
   }
 
+  Widget _buildEmptyPlayerPlaceholder() {
+    return Container(
+      color: const Color(0xFF0F0F12),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.movie_filter_outlined, size: 64, color: Colors.white24),
+            SizedBox(height: 16),
+            Text(
+              'Trình phát — Dòng thời gian 01',
+              style: TextStyle(fontSize: 15, color: Colors.white54, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Vui lòng nhập video và kéo xuống dòng thời gian',
+              style: TextStyle(fontSize: 11, color: Colors.white24),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      final state = context.read<WorkspaceBloc>().state;
-      final String videoUrl = state.videoData['videoUrl'] ?? '';
-      final String? errorMsg = _controller?.value.errorDescription;
-
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primary),
-              const SizedBox(height: 16),
-              Text(
-                'Đang tải video...\n$videoUrl',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-              ),
-              if (errorMsg != null || (_controller != null && _controller!.value.hasError)) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Lỗi: ${errorMsg ?? _controller?.value.errorDescription ?? "Không thể khởi tạo trình phát video."}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: AppColors.error),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Thử tải lại video'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white10,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _controller?.removeListener(_onPlayerUpdate);
-                      _controller?.dispose();
-                      _controller = null;
-                      _initializeController();
-                    });
-                  },
-                ),
-              ],
-            ],
-          ),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<WorkspaceBloc, WorkspaceState>(
+          listenWhen: (prev, curr) {
+            final prevUrl = prev.videoData['videoUrl'] ?? '';
+            final currUrl = curr.videoData['videoUrl'] ?? '';
+            final prevAdded = prev.videoData['addedToTimeline'] == true;
+            final currAdded = curr.videoData['addedToTimeline'] == true;
+            return prevUrl != currUrl || prevAdded != currAdded;
+          },
+          listener: (context, state) {
+            final String videoUrl = state.videoData['videoUrl'] ?? '';
+            final bool addedToTimeline = state.videoData['addedToTimeline'] == true;
+            if (videoUrl.isNotEmpty && addedToTimeline) {
+              if (_controller != null) {
+                _controller!.removeListener(_onPlayerUpdate);
+                _controller!.dispose();
+                _controller = null;
+              }
+              _initializeController();
+            }
+          },
         ),
-      );
-    }
-
-    return BlocListener<WorkspaceBloc, WorkspaceState>(
-      listenWhen: (previous, current) =>
-          current.seekRequestMs != null &&
-          current.seekRequestMs != previous.seekRequestMs,
-      listener: (context, state) {
-        if (state.seekRequestMs != null) {
-          // Scale seek target up to account for 0.7x playback speed
-          final scaledSeek = (state.seekRequestMs! / 0.7).round();
-          _controller!.seekTo(Duration(milliseconds: scaledSeek));
-          context.read<WorkspaceBloc>().add(ClearSeekRequestEvent());
-        }
-      },
+        BlocListener<WorkspaceBloc, WorkspaceState>(
+          listenWhen: (previous, current) =>
+              _controller != null &&
+              current.seekRequestMs != null &&
+              current.seekRequestMs != previous.seekRequestMs,
+          listener: (context, state) {
+            if (state.seekRequestMs != null && _controller != null) {
+              // Scale seek target up to account for 0.7x playback speed
+              final scaledSeek = (state.seekRequestMs! / 0.7).round();
+              _controller!.seekTo(Duration(milliseconds: scaledSeek));
+              context.read<WorkspaceBloc>().add(ClearSeekRequestEvent());
+            }
+          },
+        ),
+      ],
       child: BlocBuilder<WorkspaceBloc, WorkspaceState>(
         builder: (context, state) {
-        // Find active subtitle
-        final activeSub = state.subtitles.firstWhere(
-          (sub) {
-            final start = _parseTimeToMs(sub.startTime);
-            final end = _parseTimeToMs(sub.endTime);
-            return state.currentTimeMs >= start && state.currentTimeMs <= end;
-          },
-          orElse: () => const Subtitle(startTime: '', endTime: '', chineseText: '', text: ''),
-        );
+          final String videoUrl = state.videoData['videoUrl'] ?? '';
+          final bool addedToTimeline = state.videoData['addedToTimeline'] == true;
 
-        final hasActiveSubtitle = activeSub.text.isNotEmpty;
-        final currentY = _isDraggingSubtitle ? _dragYPercent : state.subtitleYPercent;
-        final showSnappingGuide = _isDraggingSubtitle && (currentY - 50.0).abs() < 2.0;
+          if (videoUrl.isEmpty || !addedToTimeline) {
+            return _buildEmptyPlayerPlaceholder();
+          }
+
+          if (_controller == null || !_controller!.value.isInitialized) {
+            final String? errorMsg = _controller?.value.errorDescription;
+
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Đang tải video...\n$videoUrl',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                    if (errorMsg != null || (_controller != null && _controller!.value.hasError)) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Lỗi: ${errorMsg ?? _controller?.value.errorDescription ?? "Không thể khởi tạo trình phát video."}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12, color: AppColors.error),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Thử tải lại video'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white10,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _controller?.removeListener(_onPlayerUpdate);
+                            _controller?.dispose();
+                            _controller = null;
+                            _initializeController();
+                          });
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // Find active subtitle
+          final activeSub = state.subtitles.firstWhere(
+            (sub) {
+              final start = _parseTimeToMs(sub.startTime);
+              final end = _parseTimeToMs(sub.endTime);
+              return state.currentTimeMs >= start && state.currentTimeMs <= end;
+            },
+            orElse: () => const Subtitle(startTime: '', endTime: '', chineseText: '', text: ''),
+          );
+
+          final hasActiveSubtitle = activeSub.text.isNotEmpty;
+          final currentY = _isDraggingSubtitle ? _dragYPercent : state.subtitleYPercent;
+          final showSnappingGuide = _isDraggingSubtitle && (currentY - 50.0).abs() < 2.0;
 
         return Column(
           children: [

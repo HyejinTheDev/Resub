@@ -191,3 +191,7 @@ class UpdateProjectVideoDataEvent extends WorkspaceEvent {
   @override
   List<Object?> get props => [videoData];
 }
+
+class AddVideoToTimelineEvent extends WorkspaceEvent {
+  const AddVideoToTimelineEvent();
+}

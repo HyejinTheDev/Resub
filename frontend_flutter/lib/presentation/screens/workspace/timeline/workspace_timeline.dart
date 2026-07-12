@@ -168,7 +168,7 @@ class _WorkspaceTimelineState extends State<WorkspaceTimeline> {
                                   top: 28,
                                   width: timelineWidth,
                                   height: 38,
-                                  child: _buildVideoTrack(timelineWidth),
+                                  child: _buildVideoTrack(state, timelineWidth),
                                 ),
 
                                 // Subtitles Track Container (Height: 38, top: 68)
@@ -296,7 +296,32 @@ class _WorkspaceTimelineState extends State<WorkspaceTimeline> {
     );
   }
 
-  Widget _buildVideoTrack(double width) {
+  Widget _buildVideoTrack(WorkspaceState state, double width) {
+    final bool addedToTimeline = state.videoData['addedToTimeline'] == true;
+
+    if (!addedToTimeline) {
+      return Container(
+        width: width,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F12),
+          border: const Border(
+            top: BorderSide(color: Colors.white10),
+            bottom: BorderSide(color: Colors.white10),
+          ),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 16),
+        child: Text(
+          'Kéo tài liệu vào đây và bắt đầu tạo',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.white.withValues(alpha: 0.15),
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: width,
       decoration: BoxDecoration(

@@ -23,7 +23,16 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<DeleteSubtitleEvent>(_onDeleteSubtitle);
     on<BulkVoiceChangeEvent>(_onBulkVoiceChange);
     on<UpdateProjectVideoDataEvent>((event, emit) {
-      emit(state.copyWith(videoData: event.videoData));
+      final updatedData = Map<String, dynamic>.from(event.videoData);
+      if (!updatedData.containsKey('addedToTimeline')) {
+        updatedData['addedToTimeline'] = false;
+      }
+      emit(state.copyWith(videoData: updatedData));
+    });
+    on<AddVideoToTimelineEvent>((event, emit) {
+      final updatedData = Map<String, dynamic>.from(state.videoData);
+      updatedData['addedToTimeline'] = true;
+      emit(state.copyWith(videoData: updatedData));
     });
   }
 
