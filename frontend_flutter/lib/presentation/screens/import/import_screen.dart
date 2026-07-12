@@ -11,6 +11,9 @@ import '../../bloc/import/import_event.dart';
 import '../../bloc/import/import_state.dart';
 import '../../bloc/workspace/workspace_bloc.dart';
 import '../../bloc/workspace/workspace_event.dart';
+import '../../../data/models/project_model.dart';
+import '../../bloc/project/project_bloc.dart';
+import '../../bloc/project/project_event.dart';
 import '../workspace/workspace_screen.dart';
 
 class ImportScreen extends StatefulWidget {
@@ -35,6 +38,79 @@ class _ImportScreenState extends State<ImportScreen> {
   void dispose() {
     _apiKeyController.dispose();
     super.dispose();
+  }
+
+  void _createNewRoomDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tạo phòng trống mới'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Nhập tên phòng (ví dụ: Phòng dịch 01)...',
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              final roomName = controller.text.trim();
+              if (roomName.isNotEmpty) {
+                final projId = 'project-${DateTime.now().millisecondsSinceEpoch}';
+                final project = ProjectModel(
+                  id: projId,
+                  name: roomName,
+                  createdAt: DateTime.now().millisecondsSinceEpoch,
+                  updatedAt: DateTime.now().millisecondsSinceEpoch,
+                  subtitles: const [],
+                  blurMasks: const [],
+                  subtitleStyle: const {
+                    'fontSize': 10.0,
+                    'yPercent': 85.0,
+                    'color': '#EAB308',
+                    'outlineColor': '#000000',
+                  },
+                  cropStyle: const {},
+                  videoTransform: const {},
+                  videoData: {
+                    'projectId': projId,
+                    'projectName': roomName,
+                    'videoUrl': '',
+                  },
+                );
+
+                // Save to local storage
+                context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));
+                
+                // Initialize in Workspace
+                context.read<WorkspaceBloc>().add(LoadProjectWorkspaceEvent(project));
+                
+                // Close dialog
+                Navigator.pop(context);
+                
+                // Redirect to Workspace
+                Navigator.pushReplacementNamed(context, '/workspace');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng nhập tên phòng!'),
+                    backgroundColor: Colors.amber,
+                  ),
+                );
+              }
+            },
+            child: const Text('Tạo phòng', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickVideo(BuildContext context) async {
@@ -422,8 +498,6 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Widget _buildImportCard(BuildContext context, ImportState state) {
-    final bool isProcessing = state is ImportUploading || state is ImportTranscribing;
-
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -433,10 +507,10 @@ class _ImportScreenState extends State<ImportScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
-              children: [
+              children: const [
                 Icon(Icons.mic, color: AppColors.primary, size: 24),
-                const SizedBox(width: 10),
-                const Text(
+                SizedBox(width: 10),
+                Text(
                   'Tải video & Dịch lồng tiếng',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
@@ -444,36 +518,38 @@ class _ImportScreenState extends State<ImportScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Tự động nhận dạng tiếng nói trong tệp video của bạn, dịch thuật sang tiếng Việt bằng công nghệ AI tiên tiến và khởi tạo dự án lồng tiếng đồng bộ.',
+              'Tạo một phòng làm việc (dự án) trống mới, sau đó bạn có thể tải video lên phòng đó và tùy chọn dịch thuật lồng tiếng bằng AI khi cần.',
               style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
             ),
-            const SizedBox(height: 24),
-
-            if (state is ImportInitial) ...[
-              _buildUploadPlaceholder(context),
-            ] else if (state is ImportFileSelected) ...[
-              _buildFileDetails(state.file),
-              const SizedBox(height: 16),
-              _buildSettingsForm(isProcessing),
-              const SizedBox(height: 20),
-              _buildStartButton(context),
-            ] else if (state is ImportUploading) ...[
-              _buildProgressCard(
-                title: 'Đang tải lên video...',
-                subtitle: '${(state.progress * 100).toStringAsFixed(1)}%',
-                value: state.progress,
+            const SizedBox(height: 32),
+            InkWell(
+              onTap: () => _createNewRoomDialog(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withValues(alpha: 0.02),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.add_box_rounded, size: 48, color: AppColors.primary),
+                    SizedBox(height: 12),
+                    Text(
+                      'Khởi tạo phòng trống mới',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Đặt tên và tạo phòng để tải video biên dịch',
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
               ),
-            ] else if (state is ImportTranscribing) ...[
-              _buildProgressCard(
-                title: 'AI đang dịch thuật & lồng tiếng...',
-                subtitle: '${state.percent}% — ${state.message}',
-                value: state.percent / 100,
-              ),
-            ] else if (state is ImportSuccess) ...[
-              _buildSuccessCard(context, state),
-            ] else if (state is ImportFailure) ...[
-              _buildFailureCard(context, state.error),
-            ],
+            ),
           ],
         ),
       ),

@@ -8,6 +8,10 @@ import '../../../bloc/workspace/workspace_bloc.dart';
 import '../../../bloc/workspace/workspace_event.dart';
 import '../../../bloc/workspace/workspace_state.dart';
 
+import '../../../bloc/import/import_bloc.dart';
+import '../../../bloc/import/import_event.dart';
+import '../../../bloc/import/import_state.dart';
+
 class SubtitleListPanel extends StatefulWidget {
   const SubtitleListPanel({super.key});
 
@@ -98,6 +102,38 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
     return BlocBuilder<WorkspaceBloc, WorkspaceState>(
       builder: (context, state) {
         final subtitles = state.subtitles;
+
+        if (subtitles.isEmpty) {
+          return BlocConsumer<ImportBloc, ImportState>(
+            listener: (context, importState) {
+              if (importState is ImportSuccess) {
+                context.read<WorkspaceBloc>().add(InitializeWorkspaceEvent(
+                      subtitles: importState.subtitles,
+                      detectedY: importState.detectedY,
+                      detectedHeight: importState.detectedHeight,
+                      videoData: state.videoData,
+                    ));
+                context.read<ImportBloc>().add(ResetImportEvent());
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Dịch video bằng AI thành công!'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            },
+            builder: (context, importState) {
+              if (importState is ImportTranscribing) {
+                return _buildTranscribingProgress(importState);
+              }
+              if (importState is ImportFailure) {
+                return _buildDubbingFailure(context, importState.error);
+              }
+              return _buildStartTranslationPlaceholder(context, state.videoData);
+            },
+          );
+        }
+
         final filteredList = subtitles.asMap().entries.where((entry) {
           final query = _searchQuery.trim().toLowerCase();
           if (query.isEmpty) return true;
@@ -375,6 +411,194 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStartTranslationPlaceholder(BuildContext context, Map<String, dynamic> videoData) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.translate_rounded, size: 56, color: AppColors.primary),
+            const SizedBox(height: 16),
+            const Text(
+              'Chưa có thuyết minh dịch thuật',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Hãy bấm nút bên dưới để AI tự động nhận dạng giọng nói tiếng Trung và dịch thuật lồng tiếng sang tiếng Việt.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _showStartTranslationDialog(context, videoData),
+              icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.black),
+              label: const Text(
+                'Dịch thuật Video (AI)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStartTranslationDialog(BuildContext context, Map<String, dynamic> videoData) {
+    bool useSystemPool = true;
+    final keyController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Cấu hình dịch thuật AI'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Dùng kho Key hệ thống', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  Switch(
+                    value: useSystemPool,
+                    activeThumbColor: AppColors.primary,
+                    onChanged: (val) {
+                      setDialogState(() {
+                        useSystemPool = val;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              if (!useSystemPool) ...[
+                const SizedBox(height: 12),
+                const Text('API Key AI của bạn (Gemini Key):', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: keyController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: 'AIzaSy...',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () {
+                final videoPath = videoData['videoPath'] ?? '';
+                final audioPath = videoData['audioPath'] ?? '';
+
+                if (videoPath.isEmpty || audioPath.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Không tìm thấy đường dẫn video trong phòng!')),
+                  );
+                  return;
+                }
+
+                context.read<ImportBloc>().add(StartTranscriptionOnlyEvent(
+                      videoPath: videoPath,
+                      audioPath: audioPath,
+                      geminiKey: useSystemPool ? null : keyController.text.trim(),
+                      useSystemPool: useSystemPool,
+                    ));
+                
+                Navigator.pop(context);
+              },
+              child: const Text('Bắt đầu dịch', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTranscribingProgress(ImportTranscribing state) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 24),
+            const Text(
+              'AI đang dịch thuật & lồng tiếng...',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: state.percent / 100,
+              minHeight: 6,
+              backgroundColor: AppColors.border,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${state.percent}% — ${state.message}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDubbingFailure(BuildContext context, String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Quá Trình Xử Lý Gặp Lỗi',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.error),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                context.read<ImportBloc>().add(ResetImportEvent());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white24,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('THỬ LẠI'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

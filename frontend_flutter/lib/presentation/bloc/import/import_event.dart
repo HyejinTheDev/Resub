@@ -53,3 +53,24 @@ class LoadSegmentAndTranscribeEvent extends ImportEvent {
   @override
   List<Object?> get props => [filePath, geminiKey, useSystemPool];
 }
+
+class UploadVideoOnlyEvent extends ImportEvent {
+  const UploadVideoOnlyEvent();
+}
+
+class StartTranscriptionOnlyEvent extends ImportEvent {
+  final String videoPath;
+  final String audioPath;
+  final String? geminiKey;
+  final bool useSystemPool;
+
+  const StartTranscriptionOnlyEvent({
+    required this.videoPath,
+    required this.audioPath,
+    this.geminiKey,
+    this.useSystemPool = true,
+  });
+
+  @override
+  List<Object?> get props => [videoPath, audioPath, geminiKey, useSystemPool];
+}

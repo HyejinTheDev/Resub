@@ -68,3 +68,12 @@ class ImportFailure extends ImportState {
   @override
   List<Object?> get props => [error];
 }
+
+class ImportUploadSuccess extends ImportState {
+  final Map<String, dynamic> videoData;
+
+  const ImportUploadSuccess({required this.videoData});
+
+  @override
+  List<Object?> get props => [videoData];
+}

@@ -18,6 +18,8 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
     on<PollProgressEvent>(_onPollProgress);
     on<ResetImportEvent>(_onResetImport);
     on<LoadSegmentAndTranscribeEvent>(_onLoadSegmentAndTranscribe);
+    on<UploadVideoOnlyEvent>(_onUploadVideoOnly);
+    on<StartTranscriptionOnlyEvent>(_onStartTranscriptionOnly);
   }
 
   void _onSelectVideo(SelectVideoEvent event, Emitter<ImportState> emit) {
@@ -173,6 +175,75 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
       add(PollProgressEvent(taskId));
     } catch (e) {
       emit(ImportFailure('Lỗi tải phân đoạn: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onUploadVideoOnly(
+    UploadVideoOnlyEvent event,
+    Emitter<ImportState> emit,
+  ) async {
+    final file = _selectedFile;
+    if (file == null) {
+      emit(const ImportFailure('Chưa chọn video nào. Vui lòng chọn tệp video.'));
+      return;
+    }
+
+    emit(ImportUploading(file: file, progress: 0.0));
+
+    try {
+      final uploadResult = await videoRepository.uploadVideo(
+        file,
+        onSendProgress: (sent, total) {
+          if (total > 0 && !isClosed) {
+            emit(ImportUploading(file: file, progress: sent / total));
+          }
+        },
+      );
+
+      final String? videoPath = uploadResult['videoPath'];
+      final String? audioPath = uploadResult['audioPath'];
+      final String? videoUrl = uploadResult['videoUrl'];
+
+      if (videoPath == null || audioPath == null || videoUrl == null) {
+        emit(const ImportFailure('Không nhận được đường dẫn tệp từ máy chủ sau khi tải lên.'));
+        return;
+      }
+
+      final Map<String, dynamic> videoData = {
+        'videoPath': videoPath,
+        'audioPath': audioPath,
+        'videoUrl': videoUrl,
+        'videoName': file.name,
+      };
+
+      emit(ImportUploadSuccess(videoData: videoData));
+    } catch (e) {
+      emit(ImportFailure('Lỗi tải lên video: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onStartTranscriptionOnly(
+    StartTranscriptionOnlyEvent event,
+    Emitter<ImportState> emit,
+  ) async {
+    emit(const ImportTranscribing(
+      file: null,
+      percent: 0,
+      message: 'Đang khởi động dịch video (AI)...',
+    ));
+
+    try {
+      final taskId = await videoRepository.startTranscription(
+        videoPath: event.videoPath,
+        audioPath: event.audioPath,
+        geminiKey: event.geminiKey,
+        useSystemPool: event.useSystemPool,
+      );
+
+      _pollingTimer?.cancel();
+      add(PollProgressEvent(taskId));
+    } catch (e) {
+      emit(ImportFailure('Lỗi khởi động dịch: ${e.toString()}'));
     }
   }
 
