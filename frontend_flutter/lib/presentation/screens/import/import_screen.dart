@@ -40,77 +40,45 @@ class _ImportScreenState extends State<ImportScreen> {
     super.dispose();
   }
 
-  void _createNewRoomDialog(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tạo phòng trống mới'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Nhập tên phòng (ví dụ: Phòng dịch 01)...',
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () {
-              final roomName = controller.text.trim();
-              if (roomName.isNotEmpty) {
-                final projId = 'project-${DateTime.now().millisecondsSinceEpoch}';
-                final project = ProjectModel(
-                  id: projId,
-                  name: roomName,
-                  createdAt: DateTime.now().millisecondsSinceEpoch,
-                  updatedAt: DateTime.now().millisecondsSinceEpoch,
-                  subtitles: const [],
-                  blurMasks: const [],
-                  subtitleStyle: const {
-                    'fontSize': 10.0,
-                    'yPercent': 85.0,
-                    'color': '#EAB308',
-                    'outlineColor': '#000000',
-                  },
-                  cropStyle: const {},
-                  videoTransform: const {},
-                  videoData: {
-                    'projectId': projId,
-                    'projectName': roomName,
-                    'videoUrl': '',
-                  },
-                );
+  void _createRoomAndNavigate(BuildContext context) {
+    final now = DateTime.now();
+    final day = now.day.toString().padLeft(2, '0');
+    final month = now.month.toString().padLeft(2, '0');
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    final roomName = 'Dự án $day/$month $hour:$minute';
 
-                // Save to local storage
-                context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));
-                
-                // Initialize in Workspace
-                context.read<WorkspaceBloc>().add(LoadProjectWorkspaceEvent(project));
-                
-                // Close dialog
-                Navigator.pop(context);
-                
-                // Redirect to Workspace
-                Navigator.pushReplacementNamed(context, '/workspace');
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vui lòng nhập tên phòng!'),
-                    backgroundColor: Colors.amber,
-                  ),
-                );
-              }
-            },
-            child: const Text('Tạo phòng', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+    final projId = 'project-${now.millisecondsSinceEpoch}';
+    final project = ProjectModel(
+      id: projId,
+      name: roomName,
+      createdAt: now.millisecondsSinceEpoch,
+      updatedAt: now.millisecondsSinceEpoch,
+      subtitles: const [],
+      blurMasks: const [],
+      subtitleStyle: const {
+        'fontSize': 10.0,
+        'yPercent': 85.0,
+        'color': '#EAB308',
+        'outlineColor': '#000000',
+      },
+      cropStyle: const {},
+      videoTransform: const {},
+      videoData: {
+        'projectId': projId,
+        'projectName': roomName,
+        'videoUrl': '',
+      },
     );
+
+    // Save to local storage
+    context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));
+    
+    // Initialize in Workspace
+    context.read<WorkspaceBloc>().add(LoadProjectWorkspaceEvent(project));
+    
+    // Redirect to Workspace
+    Navigator.pushReplacementNamed(context, '/workspace');
   }
 
   Future<void> _pickVideo(BuildContext context) async {
@@ -522,7 +490,7 @@ class _ImportScreenState extends State<ImportScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _createNewRoomDialog(context),
+          onTap: () => _createRoomAndNavigate(context),
           borderRadius: BorderRadius.circular(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
