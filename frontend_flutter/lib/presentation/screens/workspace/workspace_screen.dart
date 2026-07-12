@@ -71,7 +71,7 @@ class WorkspaceScreen extends StatelessWidget {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
                   // Go back to dashboard screen
-                  Navigator.of(context).pushReplacementNamed('/');
+                  Navigator.of(context).pushReplacementNamed('/dashboard');
                 },
               ),
             ),

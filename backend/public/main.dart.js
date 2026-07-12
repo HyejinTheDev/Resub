@@ -99592,7 +99592,7 @@ return A.T3(A.aNl(s,A.hn(s,s,B.Lj,s,s,new A.asv(a),s,s,s),r),s,A.Qw(new A.asw())
 $S:666}
 A.asv.prototype={
 $0(){var s=t.X
-A.du(this.a,!1).aAE("/",s,s)},
+A.du(this.a,!1).aAE("/dashboard",s,s)},
 $S:0}
 A.asw.prototype={
 $2(a,b){if(b.b>=900)return A.bq(A.b([A.dd(A.bh(B.OC,B.Y,B.q,B.m,0,null),5),B.IR,B.K0],t.p),B.Y,B.q,B.m)
