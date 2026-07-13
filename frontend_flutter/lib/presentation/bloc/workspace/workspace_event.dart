@@ -195,3 +195,19 @@ class UpdateProjectVideoDataEvent extends WorkspaceEvent {
 class AddVideoToTimelineEvent extends WorkspaceEvent {
   const AddVideoToTimelineEvent();
 }
+
+class UpdateStoryboardEvent extends WorkspaceEvent {
+  final Map<String, dynamic> storyboard;
+  const UpdateStoryboardEvent(this.storyboard);
+
+  @override
+  List<Object?> get props => [storyboard];
+}
+
+class UpdateSubtitlesEvent extends WorkspaceEvent {
+  final List<Subtitle> subtitles;
+  const UpdateSubtitlesEvent(this.subtitles);
+
+  @override
+  List<Object?> get props => [subtitles];
+}

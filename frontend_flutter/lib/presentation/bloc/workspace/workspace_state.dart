@@ -6,6 +6,7 @@ class WorkspaceState extends Equatable {
   final List<Subtitle> subtitles;
   final List<BlurMask> blurMasks;
   final Map<String, dynamic> videoData;
+  final Map<String, dynamic> storyboard;
   final double bgVolume;
   final double ttsVolume;
   final String defaultVoice;
@@ -31,6 +32,7 @@ class WorkspaceState extends Equatable {
     this.subtitles = const [],
     this.blurMasks = const [],
     this.videoData = const {},
+    this.storyboard = const {},
     this.bgVolume = 0.15,
     this.ttsVolume = 1.0,
     this.defaultVoice = 'vi-VN-HoaiMyNeural',
@@ -51,6 +53,7 @@ class WorkspaceState extends Equatable {
     List<Subtitle>? subtitles,
     List<BlurMask>? blurMasks,
     Map<String, dynamic>? videoData,
+    Map<String, dynamic>? storyboard,
     double? bgVolume,
     double? ttsVolume,
     String? defaultVoice,
@@ -70,6 +73,7 @@ class WorkspaceState extends Equatable {
       subtitles: subtitles ?? this.subtitles,
       blurMasks: blurMasks ?? this.blurMasks,
       videoData: videoData ?? this.videoData,
+      storyboard: storyboard ?? this.storyboard,
       bgVolume: bgVolume ?? this.bgVolume,
       ttsVolume: ttsVolume ?? this.ttsVolume,
       defaultVoice: defaultVoice ?? this.defaultVoice,
@@ -92,6 +96,7 @@ class WorkspaceState extends Equatable {
         subtitles,
         blurMasks,
         videoData,
+        storyboard,
         bgVolume,
         ttsVolume,
         defaultVoice,

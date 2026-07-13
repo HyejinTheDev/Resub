@@ -7,20 +7,12 @@ import '../../bloc/project/project_bloc.dart';
 import '../../bloc/project/project_event.dart';
 import '../../bloc/workspace/workspace_bloc.dart';
 import '../../bloc/workspace/workspace_state.dart';
-import '../../bloc/workspace/workspace_event.dart';
 
 // Import workspace subcomponents
 import 'player/workspace_video_player.dart';
 import 'timeline/workspace_timeline.dart';
 import 'inspector/inspector_panel.dart';
 import 'subtitles/subtitle_list_panel.dart';
-
-import '../../bloc/import/import_bloc.dart';
-import '../../bloc/import/import_event.dart';
-import '../../bloc/import/import_state.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:cross_file/cross_file.dart';
-import 'package:flutter/foundation.dart';
 
 class WorkspaceScreen extends StatelessWidget {
   const WorkspaceScreen({super.key});
@@ -58,6 +50,7 @@ class WorkspaceScreen extends StatelessWidget {
           cropStyle: const {},
           videoTransform: const {},
           videoData: state.videoData,
+          storyboard: state.storyboard,
         );
 
         context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));

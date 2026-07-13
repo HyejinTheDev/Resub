@@ -75,6 +75,7 @@ class ProjectRepositoryImpl implements ProjectRepository {
         cropStyle: oldProj.cropStyle,
         videoTransform: oldProj.videoTransform,
         videoData: oldProj.videoData,
+        storyboard: oldProj.storyboard,
       );
       final jsonStr = jsonEncode(projects.map((p) => p.toJson()).toList());
       try {

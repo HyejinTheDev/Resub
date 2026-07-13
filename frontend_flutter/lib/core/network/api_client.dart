@@ -385,4 +385,56 @@ class ApiClient {
       throw Exception('Lỗi nghe thử: ${e.message}');
     }
   }
+
+  /// Suggest a storyboard context from subtitles
+  Future<Map<String, dynamic>> suggestStoryboard({
+    required List<dynamic> subtitles,
+    String? geminiKey,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/suggest-storyboard',
+        data: {
+          'subtitles': subtitles,
+          'geminiKey': geminiKey ?? '',
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi phân tích gợi ý kịch bản: ${e.message}');
+    }
+  }
+
+  /// Re-translate subtitles incorporating storyboard context
+  Future<Map<String, dynamic>> translateWithStoryboard({
+    required List<dynamic> subtitles,
+    required Map<String, dynamic> storyboard,
+    String? geminiKey,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/translate-with-storyboard',
+        data: {
+          'subtitles': subtitles,
+          'storyboard': storyboard,
+          'geminiKey': geminiKey ?? '',
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi dịch lại kịch bản: ${e.message}');
+    }
+  }
 }

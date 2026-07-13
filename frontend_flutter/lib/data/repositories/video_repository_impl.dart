@@ -74,4 +74,36 @@ class VideoRepositoryImpl implements VideoRepository {
     }
     throw Exception(result['error'] ?? 'Không thể tạo âm thanh nghe thử');
   }
+
+  @override
+  Future<Map<String, dynamic>> suggestStoryboard({
+    required List<dynamic> subtitles,
+    String? geminiKey,
+  }) async {
+    final result = await apiClient.suggestStoryboard(
+      subtitles: subtitles,
+      geminiKey: geminiKey,
+    );
+    if (result['success'] == true && result['suggestion'] != null) {
+      return result['suggestion'] as Map<String, dynamic>;
+    }
+    throw Exception(result['error'] ?? 'Không thể gợi ý kịch bản');
+  }
+
+  @override
+  Future<Map<String, dynamic>> translateWithStoryboard({
+    required List<dynamic> subtitles,
+    required Map<String, dynamic> storyboard,
+    String? geminiKey,
+  }) async {
+    final result = await apiClient.translateWithStoryboard(
+      subtitles: subtitles,
+      storyboard: storyboard,
+      geminiKey: geminiKey,
+    );
+    if (result['success'] == true && result['subtitles'] != null) {
+      return result;
+    }
+    throw Exception(result['error'] ?? 'Không thể dịch lại kịch bản');
+  }
 }

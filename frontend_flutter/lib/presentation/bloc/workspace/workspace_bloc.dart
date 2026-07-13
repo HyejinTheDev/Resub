@@ -34,6 +34,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       updatedData['addedToTimeline'] = true;
       emit(state.copyWith(videoData: updatedData));
     });
+    on<UpdateStoryboardEvent>((event, emit) {
+      emit(state.copyWith(storyboard: event.storyboard));
+    });
+    on<UpdateSubtitlesEvent>((event, emit) {
+      emit(state.copyWith(subtitles: event.subtitles));
+    });
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {
@@ -165,6 +171,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       subtitles: subs,
       blurMasks: masks,
       videoData: event.project.videoData,
+      storyboard: event.project.storyboard,
       subtitleFontSize: fs,
       subtitleYPercent: yp,
       subtitleColor: col,

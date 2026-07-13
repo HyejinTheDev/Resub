@@ -14,7 +14,6 @@ import '../../../bloc/workspace/workspace_state.dart';
 import '../../../bloc/import/import_bloc.dart';
 import '../../../bloc/import/import_event.dart';
 import '../../../bloc/import/import_state.dart';
-import '../../../../domain/entities/subtitle.dart';
 
 class SubtitleListPanel extends StatefulWidget {
   const SubtitleListPanel({super.key});

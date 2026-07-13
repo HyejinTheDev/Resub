@@ -9,6 +9,7 @@ class ProjectModel {
   final Map<String, dynamic> cropStyle;
   final Map<String, dynamic> videoTransform;
   final Map<String, dynamic> videoData;
+  final Map<String, dynamic> storyboard;
 
   ProjectModel({
     required this.id,
@@ -21,6 +22,7 @@ class ProjectModel {
     required this.cropStyle,
     required this.videoTransform,
     required this.videoData,
+    required this.storyboard,
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class ProjectModel {
       cropStyle: json['cropStyle'] as Map<String, dynamic>? ?? {},
       videoTransform: json['videoTransform'] as Map<String, dynamic>? ?? {},
       videoData: json['videoData'] as Map<String, dynamic>? ?? {},
+      storyboard: json['storyboard'] as Map<String, dynamic>? ?? {},
     );
   }
 
@@ -50,6 +53,7 @@ class ProjectModel {
       'cropStyle': cropStyle,
       'videoTransform': videoTransform,
       'videoData': videoData,
+      'storyboard': storyboard,
     };
   }
 }

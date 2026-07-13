@@ -69,6 +69,7 @@ class _ImportScreenState extends State<ImportScreen> {
         'projectName': roomName,
         'videoUrl': '',
       },
+      storyboard: const {},
     );
 
     // Save to local storage

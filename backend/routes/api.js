@@ -38,6 +38,7 @@ const { exportDubbedVideo, generateTTS, getFfprobeCommand } = require('../servic
 const { exportQueue, transcribeQueue } = require('../services/taskQueue');
 const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
 const { detectSubtitlePosition } = require('../services/geminiService');
+const { suggestStoryboard, translateWithStoryboard } = require('../services/storyboardService');
 
 const router = express.Router();
 
@@ -1722,6 +1723,52 @@ router.post('/load-split-segment', async (req, res) => {
     });
   } catch (error) {
     console.error('Failed to load split segment:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. Suggest Storyboard/Context from subtitles
+router.post('/suggest-storyboard', async (req, res) => {
+  const { subtitles, geminiKey } = req.body;
+  if (!subtitles || !Array.isArray(subtitles)) {
+    return res.status(400).json({ error: 'subtitles array is required' });
+  }
+
+  const useSystemPool = !geminiKey;
+  const fetchKey = async () => {
+    if (!useSystemPool) return geminiKey;
+    return fetchKeyFromManager();
+  };
+
+  try {
+    const apiKey = await fetchKey();
+    const suggestion = await suggestStoryboard(subtitles, apiKey);
+    res.json({ success: true, suggestion });
+  } catch (error) {
+    console.error('[api/suggest-storyboard] Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 9. Re-translate subtitles incorporating storyboard context
+router.post('/translate-with-storyboard', async (req, res) => {
+  const { subtitles, storyboard, geminiKey } = req.body;
+  if (!subtitles || !Array.isArray(subtitles) || !storyboard) {
+    return res.status(400).json({ error: 'subtitles and storyboard are required' });
+  }
+
+  const useSystemPool = !geminiKey;
+  const fetchKey = async () => {
+    if (!useSystemPool) return geminiKey;
+    return fetchKeyFromManager();
+  };
+
+  try {
+    const apiKey = await fetchKey();
+    const translated = await translateWithStoryboard(subtitles, storyboard, apiKey);
+    res.json({ success: true, subtitles: translated });
+  } catch (error) {
+    console.error('[api/translate-with-storyboard] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

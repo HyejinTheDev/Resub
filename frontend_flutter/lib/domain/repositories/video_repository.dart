@@ -37,4 +37,10 @@ abstract class VideoRepository {
 
   /// Generate TTS preview audio URL.
   Future<String> ttsPreview({required String text, required String voice, required String capcutCookie});
+
+  /// Suggest a storyboard context from subtitles.
+  Future<Map<String, dynamic>> suggestStoryboard({required List<dynamic> subtitles, String? geminiKey});
+
+  /// Re-translate subtitles incorporating storyboard context.
+  Future<Map<String, dynamic>> translateWithStoryboard({required List<dynamic> subtitles, required Map<String, dynamic> storyboard, String? geminiKey});
 }
