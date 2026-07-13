@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../../core/constants/colors.dart';
 import '../../../../../domain/repositories/video_repository.dart';
@@ -23,6 +25,13 @@ class _StoryboardTabState extends State<StoryboardTab> {
   bool _isAnalyzing = false;
   bool _isTranslating = false;
   String _statusMessage = '';
+  List<dynamic> _presets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPresets();
+  }
 
   @override
   void dispose() {
@@ -30,6 +39,132 @@ class _StoryboardTabState extends State<StoryboardTab> {
     _rulesController.dispose();
     _toneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPresets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString('resub_global_storyboard_presets');
+      if (jsonStr != null) {
+        setState(() {
+          _presets = jsonDecode(jsonStr) as List<dynamic>;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load presets: $e');
+    }
+  }
+
+  Future<void> _savePreset(String name, String contextText, String rulesText, String toneText) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<dynamic> updated = List<dynamic>.from(_presets);
+      
+      updated.insert(0, {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'name': name,
+        'context': contextText,
+        'characterRules': rulesText,
+        'translationTone': toneText,
+      });
+
+      await prefs.setString('resub_global_storyboard_presets', jsonEncode(updated));
+      setState(() {
+        _presets = updated;
+      });
+    } catch (e) {
+      debugPrint('Failed to save preset: $e');
+    }
+  }
+
+  Future<void> _deletePreset(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<dynamic> updated = List<dynamic>.from(_presets);
+      updated.removeWhere((item) => item['id'] == id);
+
+      await prefs.setString('resub_global_storyboard_presets', jsonEncode(updated));
+      setState(() {
+        _presets = updated;
+      });
+    } catch (e) {
+      debugPrint('Failed to delete preset: $e');
+    }
+  }
+
+  void _applyPreset(BuildContext context, WorkspaceState state, Map<String, dynamic> preset) {
+    final String c = preset['context']?.toString() ?? '';
+    final String cr = preset['characterRules']?.toString() ?? '';
+    final String tt = preset['translationTone']?.toString() ?? '';
+
+    _contextController.text = c;
+    _rulesController.text = cr;
+    _toneController.text = tt;
+
+    _updateStoryboard(context, state, c: c, cr: cr, tt: tt);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã áp dụng kịch bản mẫu "${preset['name']}"!'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+
+  Future<void> _showSavePresetDialog(BuildContext context, WorkspaceState state) async {
+    final String contextText = _contextController.text.trim();
+    final String rulesText = _rulesController.text.trim();
+    final String toneText = _toneController.text.trim();
+
+    if (contextText.isEmpty && rulesText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng điền nội dung kịch bản trước khi lưu!')),
+      );
+      return;
+    }
+
+    final TextEditingController nameController = TextEditingController(
+      text: 'Mẫu kịch bản ${DateTime.now().day}/${DateTime.now().month}'
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E202C),
+        title: const Text('Lưu kịch bản mẫu', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Tên kịch bản mẫu',
+            labelStyle: TextStyle(color: Colors.white70),
+          ),
+          style: const TextStyle(color: Colors.white),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              final String name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                _savePreset(name, contextText, rulesText, toneText);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã lưu mẫu kịch bản vào lịch sử!'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              }
+            },
+            child: const Text('LƯU', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _updateStoryboard(BuildContext context, WorkspaceState state, {String? c, String? cr, String? tt}) {
@@ -56,7 +191,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
     try {
       final videoRepository = RepositoryProvider.of<VideoRepository>(context);
       
-      // Convert subtitles to backend payload format
       final List<Map<String, dynamic>> subsJson = state.subtitles.map((s) => {
         'startTime': s.startTime,
         'endTime': s.endTime,
@@ -160,7 +294,7 @@ class _StoryboardTabState extends State<StoryboardTab> {
           endTime: item['endTime']?.toString() ?? oldSub.endTime,
           chineseText: item['chineseText']?.toString() ?? oldSub.chineseText,
           text: item['text']?.toString() ?? oldSub.text,
-          voice: oldSub.voice, // maintain customized voice voice configuration
+          voice: oldSub.voice,
         ));
       }
 
@@ -192,7 +326,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
   Widget build(BuildContext context) {
     return BlocBuilder<WorkspaceBloc, WorkspaceState>(
       builder: (context, state) {
-        // Sync local inputs if not initialized yet
         if (_contextController.text.isEmpty && state.storyboard['context'] != null) {
           _contextController.text = state.storyboard['context'].toString();
         }
@@ -210,7 +343,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Section 1: Introduction
               const Text(
                 'KỊCH BẢN & XƯNG HÔ',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
@@ -222,7 +354,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
               ),
               const SizedBox(height: 20),
 
-              // Context Input
               TextField(
                 controller: _contextController,
                 decoration: const InputDecoration(
@@ -236,7 +367,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
               ),
               const SizedBox(height: 16),
 
-              // Character rules Input
               TextField(
                 controller: _rulesController,
                 decoration: const InputDecoration(
@@ -250,7 +380,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
               ),
               const SizedBox(height: 16),
 
-              // Translation Tone Input
               TextField(
                 controller: _toneController,
                 decoration: const InputDecoration(
@@ -266,7 +395,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
               const Divider(color: AppColors.border),
               const SizedBox(height: 16),
 
-              // Status indicator
               if (isLoading) ...[
                 Column(
                   children: [
@@ -286,7 +414,6 @@ class _StoryboardTabState extends State<StoryboardTab> {
                 ),
               ],
 
-              // Action buttons
               Row(
                 children: [
                   Expanded(
@@ -316,6 +443,119 @@ class _StoryboardTabState extends State<StoryboardTab> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: 28),
+              const Divider(color: AppColors.border),
+              const SizedBox(height: 16),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'LỊCH SỬ KỊCH BẢN MẪU',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.bookmark_add_outlined, size: 14, color: AppColors.primary),
+                    label: const Text('Lưu mẫu mới', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+                    onPressed: isLoading ? null : () => _showSavePresetDialog(context, state),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (_presets.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.02),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    'Chưa có mẫu kịch bản nào được lưu.\nBạn có thể lưu kịch bản hiện tại để dùng lại sau này.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.4), height: 1.4),
+                  ),
+                ),
+              ] else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _presets.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final preset = _presets[index] as Map<String, dynamic>;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  preset['name']?.toString() ?? 'Không tên',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  preset['context']?.toString() ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Apply Button
+                          IconButton(
+                            icon: const Icon(Icons.download_rounded, color: AppColors.primary, size: 18),
+                            tooltip: 'Áp dụng',
+                            onPressed: isLoading ? null : () => _applyPreset(context, state, preset),
+                          ),
+                          // Delete Button
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                            tooltip: 'Xóa',
+                            onPressed: isLoading ? null : () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF1E202C),
+                                  title: const Text('Xóa kịch bản mẫu?', style: TextStyle(color: Colors.white)),
+                                  content: Text(
+                                    'Bạn có chắc chắn muốn xóa mẫu kịch bản "${preset['name']}" khỏi lịch sử không?',
+                                    style: const TextStyle(color: Colors.white70),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _deletePreset(preset['id']?.toString() ?? '');
+                                      },
+                                      child: const Text('XÓA', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         );
