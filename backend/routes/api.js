@@ -1150,7 +1150,7 @@ router.post('/download', async (req, res) => {
     const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
     const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow.mp4`);
     console.log(`[api/download] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
     const { execSync } = require('child_process');
     execSync(slowCmd);
     fs.unlinkSync(videoPath);
@@ -1199,7 +1199,7 @@ router.post('/upload', upload.single('video'), async (req, res) => {
     const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
     const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow${path.extname(req.file.filename)}`);
     console.log(`[api/upload] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
     execSync(slowCmd);
     fs.unlinkSync(videoPath);
     fs.renameSync(tempSlowPath, videoPath);
@@ -1706,7 +1706,7 @@ router.post('/load-split-segment', async (req, res) => {
   
   try {
     console.log(`[api/load-split-segment] Slowing down split segment to 0.7x speed: ${filePath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${filePath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    const slowCmd = `${safeFfmpeg} -y -i "${filePath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
     execSync(slowCmd);
     fs.renameSync(tempSlowPath, targetVideoPath);
 
