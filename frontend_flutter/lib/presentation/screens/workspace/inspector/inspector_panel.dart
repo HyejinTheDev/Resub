@@ -5,7 +5,6 @@ import 'tabs/text_tab.dart';
 import 'tabs/audio_tab.dart';
 import 'tabs/mask_tab.dart';
 import 'tabs/export_tab.dart';
-import 'tabs/upload_tab.dart';
 import 'tabs/storyboard_tab.dart';
 
 class InspectorPanel extends StatelessWidget {
@@ -14,7 +13,7 @@ class InspectorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
+      length: 5,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: const PreferredSize(
@@ -31,7 +30,6 @@ class InspectorPanel extends StatelessWidget {
                 Tab(icon: Icon(Icons.blur_on, size: 20), text: 'Mờ'),
                 Tab(icon: Icon(Icons.movie_creation_outlined, size: 20), text: 'Kịch bản'),
                 Tab(icon: Icon(Icons.download, size: 20), text: 'Xuất'),
-                Tab(icon: Icon(Icons.cloud_upload, size: 20), text: 'Nhập'),
               ],
             ),
           ),
@@ -47,7 +45,6 @@ class InspectorPanel extends StatelessWidget {
               MaskTab(),
               StoryboardTab(),
               ExportTab(),
-              UploadTab(),
             ],
           ),
         ),
