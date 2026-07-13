@@ -10,7 +10,7 @@ const { transcribeAndTranslate } = require('./geminiService');
 // Segment tuning: short segments keep Gemini's timestamps tightly aligned to speech.
 const SEGMENT_SEC = 30;
 const OVERLAP_SEC = 2;
-const CONCURRENCY = 15;
+const CONCURRENCY = 3;
 
 function runCommand(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -137,6 +137,16 @@ async function processSegment(segment, keyState, reportBadKey, acquireKey) {
       lastError = error;
       attempts++;
       console.warn(`[transcriptionEngine] Segment ${segment.index} attempt ${attempts} failed: ${error.message}`);
+
+      const isRateLimit = error.response?.status === 429 || 
+                          error.message.includes('429') || 
+                          error.message.toLowerCase().includes('exhausted') ||
+                          error.message.toLowerCase().includes('limit');
+
+      if (isRateLimit) {
+        console.log(`[transcriptionEngine] Segment ${segment.index} hit rate limit. Sleeping 4 seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
 
       if (acquireKey) {
         const isInvalid = error.message.includes('403') || error.message.includes('API key not valid');
