@@ -1144,6 +1144,18 @@ router.post('/download', async (req, res) => {
 
   try {
     const videoPath = await downloadVideo(url, VIDEOS_DIR, videoId);
+    
+    // Slow down the downloaded video to 0.7x in-place using ffmpeg
+    const ffmpeg = getFfmpegCommand();
+    const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+    const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow.mp4`);
+    console.log(`[api/download] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
+    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    const { execSync } = require('child_process');
+    execSync(slowCmd);
+    fs.unlinkSync(videoPath);
+    fs.renameSync(tempSlowPath, videoPath);
+
     const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
     await extractAudio(videoPath, audioPath);
 
@@ -1181,6 +1193,16 @@ router.post('/upload', upload.single('video'), async (req, res) => {
       fs.unlinkSync(videoPath);
       return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
     }
+
+    // Slow down the uploaded video to 0.7x in-place using ffmpeg
+    const ffmpeg = getFfmpegCommand();
+    const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+    const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow${path.extname(req.file.filename)}`);
+    console.log(`[api/upload] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
+    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    execSync(slowCmd);
+    fs.unlinkSync(videoPath);
+    fs.renameSync(tempSlowPath, videoPath);
 
     await extractAudio(videoPath, audioPath);
 
@@ -1462,7 +1484,7 @@ router.post('/dub', async (req, res) => {
         exportResolution,
         exportQuality,
         burnSubtitles: burnSubtitles !== undefined ? burnSubtitles : true,
-        videoSpeed: videoSpeed !== undefined ? parseFloat(videoSpeed) : 1.0,
+        videoSpeed: 1.0,
         onProgress: ({ percent, message }) => {
           if (!cancelToken.cancelled) {
             global.dubProgress[exportId] = { status: 'processing', percent, message };
@@ -1673,14 +1695,21 @@ router.post('/load-split-segment', async (req, res) => {
   const videoId = uuidv4();
   const videoExt = path.extname(filePath);
   
-  // Copy the split file into downloads/videos
+  // Copy and slow down the split file into downloads/videos
   const targetVideoPath = path.join(VIDEOS_DIR, `${videoId}${videoExt}`);
-  fs.copyFileSync(filePath, targetVideoPath);
+  const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow${videoExt}`);
+  const ffmpeg = getFfmpegCommand();
+  const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
 
   // Extract audio
   const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
   
   try {
+    console.log(`[api/load-split-segment] Slowing down split segment to 0.7x speed: ${filePath} -> ${tempSlowPath}`);
+    const slowCmd = `${safeFfmpeg} -y -i "${filePath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" "${tempSlowPath}"`;
+    execSync(slowCmd);
+    fs.renameSync(tempSlowPath, targetVideoPath);
+
     await extractAudio(targetVideoPath, audioPath);
 
     res.json({
