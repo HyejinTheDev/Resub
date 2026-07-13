@@ -211,3 +211,7 @@ class UpdateSubtitlesEvent extends WorkspaceEvent {
   @override
   List<Object?> get props => [subtitles];
 }
+
+class ResetWorkspaceEvent extends WorkspaceEvent {
+  const ResetWorkspaceEvent();
+}

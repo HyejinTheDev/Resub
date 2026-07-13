@@ -387,20 +387,69 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
                         },
                       )
                     else
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.translate, size: 14, color: Colors.black),
-                        label: const Text('Chuyển sang Phụ đề', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _currentTab = 1;
-                          });
-                        },
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.translate, size: 14, color: Colors.black),
+                            label: const Text('Chuyển sang Phụ đề', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: Size.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _currentTab = 1;
+                              });
+                            },
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.delete_sweep_outlined, size: 14, color: Colors.redAccent),
+                            label: const Text('Dọn dẹp', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              minimumSize: Size.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF1E202C),
+                                  title: const Text('Dọn dẹp phòng làm việc?', style: TextStyle(color: Colors.white)),
+                                  content: const Text(
+                                    'Hành động này sẽ xóa toàn bộ video, dòng thời gian và phụ đề hiện tại để chuẩn bị làm video tiếp theo. Bạn có chắc chắn muốn tiếp tục?',
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('HỦY', style: TextStyle(color: Colors.grey)),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        context.read<WorkspaceBloc>().add(const ResetWorkspaceEvent());
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Đã dọn dẹp phòng làm việc thành công!'),
+                                            backgroundColor: AppColors.primary,
+                                          ),
+                                        );
+                                      },
+                                      child: const Text('DỌN DẸP', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                   ],
                 ),

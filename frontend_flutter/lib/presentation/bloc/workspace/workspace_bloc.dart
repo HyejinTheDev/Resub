@@ -40,6 +40,19 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<UpdateSubtitlesEvent>((event, emit) {
       emit(state.copyWith(subtitles: event.subtitles));
     });
+    on<ResetWorkspaceEvent>((event, emit) {
+      final newProjId = 'project-${DateTime.now().millisecondsSinceEpoch}';
+      emit(WorkspaceState(
+        subtitles: const [],
+        blurMasks: const [],
+        videoData: {
+          'projectId': newProjId,
+          'projectName': 'Dự án mới',
+          'addedToTimeline': false,
+        },
+        storyboard: const {},
+      ));
+    });
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {
