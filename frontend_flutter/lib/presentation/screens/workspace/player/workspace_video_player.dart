@@ -39,7 +39,7 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
       _controller!.initialize().then((_) {
         // Restore background volume once successfully initialized
         _controller!.setVolume(state.bgVolume);
-        _controller!.setPlaybackSpeed(1.0); // Play 1.0x speed by default
+        _controller!.setPlaybackSpeed(0.7); // Play 0.7x slower by default
         setState(() {});
         _controller!.addListener(_onPlayerUpdate);
       }).catchError((error) {
