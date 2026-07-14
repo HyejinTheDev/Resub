@@ -735,6 +735,13 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Widget _buildFailureCard(BuildContext context, String error) {
+    String friendlyError = error;
+    if (error.contains('503')) {
+      friendlyError = 'Máy chủ dịch thuật đang khởi động hoặc quá tải (Lỗi 503). Vui lòng chờ 1 phút rồi bấm THỬ LẠI để thực hiện lại.';
+    } else if (error.contains('404') || error.toLowerCase().contains('not found') || error.toLowerCase().contains('không tìm thấy')) {
+      friendlyError = 'Không tìm thấy tệp video trên máy chủ (Lỗi 404 - có thể máy chủ vừa khởi động lại). Vui lòng bấm THỬ LẠI để tải lên video từ đầu.';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -747,9 +754,9 @@ class _ImportScreenState extends State<ImportScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          error,
+          friendlyError,
           textAlign: TextAlign.center,
-          maxLines: 4,
+          maxLines: 6,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),

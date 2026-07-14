@@ -1098,6 +1098,13 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
   }
 
   Widget _buildDubbingFailure(BuildContext context, String error) {
+    String friendlyError = error;
+    if (error.contains('503')) {
+      friendlyError = 'Máy chủ dịch thuật đang khởi động hoặc quá tải (Lỗi 503). Vui lòng chờ 1 phút, sau đó bấm nút "Dọn dẹp" ở cột Phương tiện để tải lại video.';
+    } else if (error.contains('404') || error.toLowerCase().contains('not found') || error.toLowerCase().contains('không tìm thấy')) {
+      friendlyError = 'Không tìm thấy tệp video trên máy chủ (Lỗi 404 - có thể máy chủ vừa khởi động lại). Vui lòng bấm nút "Dọn dẹp" ở cột Phương tiện để tải lại video từ đầu.';
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -1113,9 +1120,9 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
             ),
             const SizedBox(height: 8),
             Text(
-              error,
+              friendlyError,
               textAlign: TextAlign.center,
-              maxLines: 4,
+              maxLines: 6,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppColors.textMuted, fontSize: 11, height: 1.4),
             ),

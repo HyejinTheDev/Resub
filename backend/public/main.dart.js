@@ -99678,8 +99678,10 @@ return A.dA(new A.bu(B.ef,A.bw(A.b([B.Lr,B.a2,B.a47,B.as,B.a2t,B.b4,A.ld(B.Lv,B.
 apo(a,b){var s={}
 s.a=!0
 A.vs(!0,new A.aEj(s,new A.dL(B.bt,$.as()),b),a,t.z)},
-abe(a,b){var s=null
-return A.dA(new A.bu(B.ef,A.bw(A.b([B.Lz,B.a2,B.a3a,B.as,A.av(b,4,B.an,s,s,B.a_T,B.R,s),B.c_,A.fU(!1,B.Cx,s,s,s,s,s,s,new A.aDL(a),s,A.dB(s,s,B.ci,s,s,s,s,s,s,B.h,s,s,s,s,s,s,s,s,s,s))],t.p),B.t,B.aF,B.n),s),s,s)}}
+abe(a,b){var s,r=null
+if(B.c.q(b,"503"))s='M\xe1y ch\u1ee7 d\u1ecbch thu\u1eadt \u0111ang kh\u1edfi \u0111\u1ed9ng ho\u1eb7c qu\xe1 t\u1ea3i (L\u1ed7i 503). Vui l\xf2ng ch\u1edd 1 ph\xfat, sau \u0111\xf3 b\u1ea5m n\xfat "D\u1ecdn d\u1eb9p" \u1edf c\u1ed9t Ph\u01b0\u01a1ng ti\u1ec7n \u0111\u1ec3 t\u1ea3i l\u1ea1i video.'
+else s=B.c.q(b,"404")||B.c.q(b.toLowerCase(),"not found")||B.c.q(b.toLowerCase(),"kh\xf4ng t\xecm th\u1ea5y")?'Kh\xf4ng t\xecm th\u1ea5y t\u1ec7p video tr\xean m\xe1y ch\u1ee7 (L\u1ed7i 404 - c\xf3 th\u1ec3 m\xe1y ch\u1ee7 v\u1eeba kh\u1edfi \u0111\u1ed9ng l\u1ea1i). Vui l\xf2ng b\u1ea5m n\xfat "D\u1ecdn d\u1eb9p" \u1edf c\u1ed9t Ph\u01b0\u01a1ng ti\u1ec7n \u0111\u1ec3 t\u1ea3i l\u1ea1i video t\u1eeb \u0111\u1ea7u.':b
+return A.dA(new A.bu(B.ef,A.bw(A.b([B.Lz,B.a2,B.a3a,B.as,A.av(s,6,B.an,r,r,B.a_T,B.R,r),B.c_,A.fU(!1,B.Cx,r,r,r,r,r,r,new A.aDL(a),r,A.dB(r,r,B.ci,r,r,r,r,r,r,B.h,r,r,r,r,r,r,r,r,r,r))],t.p),B.t,B.aF,B.n),r),r,r)}}
 A.aEc.prototype={
 $0(){this.a.f=this.b},
 $S:0}
