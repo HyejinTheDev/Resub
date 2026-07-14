@@ -43,6 +43,15 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final workspaceState = context.read<WorkspaceBloc>().state;
+    if (workspaceState.videoData['videoUrl']?.toString().isNotEmpty == true) {
+      _currentTab = 1;
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _urlController.dispose();
@@ -466,19 +475,42 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ImportBloc, ImportState>(
-      listener: (context, importState) {
-        if (importState is ImportUploadSuccess) {
-          context.read<WorkspaceBloc>().add(UpdateProjectVideoDataEvent(importState.videoData));
-          context.read<ImportBloc>().add(ResetImportEvent());
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tải video lên phòng thành công! Bấm nút "+" trên video để đưa xuống dòng thời gian.'),
-              backgroundColor: AppColors.primary,
-            ),
-          );
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ImportBloc, ImportState>(
+          listener: (context, importState) {
+            if (importState is ImportUploadSuccess) {
+              context.read<WorkspaceBloc>().add(UpdateProjectVideoDataEvent(importState.videoData));
+              context.read<ImportBloc>().add(ResetImportEvent());
+              setState(() {
+                _currentTab = 1;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tải video thành công! Bấm nút "+" trên video để đưa xuống dòng thời gian.'),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            }
+          },
+        ),
+        BlocListener<WorkspaceBloc, WorkspaceState>(
+          listenWhen: (previous, current) =>
+              previous.videoData['videoUrl'] != current.videoData['videoUrl'],
+          listener: (context, workspaceState) {
+            final String videoUrl = workspaceState.videoData['videoUrl'] ?? '';
+            if (videoUrl.isEmpty) {
+              setState(() {
+                _currentTab = 0;
+              });
+            } else {
+              setState(() {
+                _currentTab = 1;
+              });
+            }
+          },
+        ),
+      ],
       child: BlocBuilder<WorkspaceBloc, WorkspaceState>(
         builder: (context, state) {
           final subtitles = state.subtitles;
