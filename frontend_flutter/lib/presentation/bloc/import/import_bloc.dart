@@ -20,6 +20,7 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
     on<LoadSegmentAndTranscribeEvent>(_onLoadSegmentAndTranscribe);
     on<UploadVideoOnlyEvent>(_onUploadVideoOnly);
     on<StartTranscriptionOnlyEvent>(_onStartTranscriptionOnly);
+    on<ImportFromUrlEvent>(_onImportFromUrl);
   }
 
   void _onSelectVideo(SelectVideoEvent event, Emitter<ImportState> emit) {
@@ -251,6 +252,35 @@ class ImportBloc extends Bloc<ImportEvent, ImportState> {
     _pollingTimer?.cancel();
     _selectedFile = null;
     emit(ImportInitial());
+  }
+
+  Future<void> _onImportFromUrl(
+    ImportFromUrlEvent event,
+    Emitter<ImportState> emit,
+  ) async {
+    emit(const ImportUploading(file: null, progress: 0.1));
+    try {
+      final result = await videoRepository.downloadVideo(event.url);
+      final String? videoPath = result['videoPath'];
+      final String? audioPath = result['audioPath'];
+      final String? videoUrl = result['videoUrl'];
+
+      if (videoPath == null || audioPath == null || videoUrl == null) {
+        emit(const ImportFailure('Không nhận được tệp từ link đã cho.'));
+        return;
+      }
+
+      final Map<String, dynamic> videoData = {
+        'videoPath': videoPath,
+        'audioPath': audioPath,
+        'videoUrl': videoUrl,
+        'videoName': 'Video từ link.mp4',
+      };
+
+      emit(ImportUploadSuccess(videoData: videoData));
+    } catch (e) {
+      emit(ImportFailure('Lỗi tải từ link: ${e.toString()}'));
+    }
   }
 
   @override

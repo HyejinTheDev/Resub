@@ -43,4 +43,7 @@ abstract class VideoRepository {
 
   /// Re-translate subtitles incorporating storyboard context.
   Future<Map<String, dynamic>> translateWithStoryboard({required List<dynamic> subtitles, required Map<String, dynamic> storyboard, String? geminiKey});
+
+  /// Download a video from a URL (YouTube, Drive, etc.) on the server.
+  Future<Map<String, dynamic>> downloadVideo(String url);
 }

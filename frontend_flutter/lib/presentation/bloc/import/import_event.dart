@@ -74,3 +74,11 @@ class StartTranscriptionOnlyEvent extends ImportEvent {
   @override
   List<Object?> get props => [videoPath, audioPath, geminiKey, useSystemPool];
 }
+
+class ImportFromUrlEvent extends ImportEvent {
+  final String url;
+  const ImportFromUrlEvent(this.url);
+
+  @override
+  List<Object?> get props => [url];
+}

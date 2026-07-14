@@ -28,6 +28,8 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
   int _previewLoadingIndex = -1;
   VideoPlayerController? _previewAudioController;
   int _currentTab = 0; // 0 = Phương tiện (Media), 1 = Phụ đề (Subtitles)
+  int _importMode = 0; // 0 = Tải tệp lên, 1 = Nhập từ Link
+  final TextEditingController _urlController = TextEditingController();
 
   final List<Map<String, String>> _voices = [
     {'value': 'vi-VN-HoaiMyNeural', 'label': 'Hoài My (Nữ miền Nam)'},
@@ -43,6 +45,7 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
   @override
   void dispose() {
     _searchController.dispose();
+    _urlController.dispose();
     _previewAudioController?.dispose();
     super.dispose();
   }
@@ -557,11 +560,101 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
                                 return Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
                                       if (importState is ImportInitial || importState is ImportFailure) ...[
-                                        _buildUploadZonePlaceholder(context, isProcessing),
+                                        // Mode switch buttons
+                                        Container(
+                                          margin: const EdgeInsets.only(bottom: 16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.05),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: InkWell(
+                                                  onTap: () => setState(() => _importMode = 0),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                                    decoration: BoxDecoration(
+                                                      color: _importMode == 0 ? AppColors.primary : Colors.transparent,
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Text(
+                                                      'Tải tệp lên',
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: _importMode == 0 ? Colors.black : Colors.white70,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: InkWell(
+                                                  onTap: () => setState(() => _importMode = 1),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                                    decoration: BoxDecoration(
+                                                      color: _importMode == 1 ? AppColors.primary : Colors.transparent,
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Text(
+                                                      'Nhập từ Link',
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: _importMode == 1 ? Colors.black : Colors.white70,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        if (_importMode == 0) ...[
+                                          _buildUploadZonePlaceholder(context, isProcessing),
+                                        ] else ...[
+                                          TextField(
+                                            controller: _urlController,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Đường dẫn video (URL)',
+                                              hintText: 'Link Youtube, Drive, TikTok...',
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                            ),
+                                            style: const TextStyle(fontSize: 12, color: Colors.white),
+                                            enabled: !isProcessing,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          ElevatedButton(
+                                            onPressed: isProcessing
+                                                ? null
+                                                : () {
+                                                    final String url = _urlController.text.trim();
+                                                    if (url.isEmpty) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(content: Text('Vui lòng nhập đường dẫn video!')),
+                                                      );
+                                                      return;
+                                                    }
+                                                    context.read<ImportBloc>().add(ImportFromUrlEvent(url));
+                                                  },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                              foregroundColor: Colors.black,
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                            ),
+                                            child: const Text('TẢI VỀ & NHẬP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                        
                                         if (importState is ImportFailure) ...[
                                           const SizedBox(height: 16),
                                           _buildUploadFailureCard(context, importState.error),

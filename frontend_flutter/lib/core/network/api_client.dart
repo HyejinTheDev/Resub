@@ -437,4 +437,23 @@ class ApiClient {
       throw Exception('Lỗi dịch lại kịch bản: ${e.message}');
     }
   }
+
+  /// Download a video from a URL (YouTube, Drive, etc.) on the server
+  Future<Map<String, dynamic>> downloadVideo(String url) async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/api/download',
+        data: {'url': url},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        final data = e.response?.data;
+        if (data is Map && data.containsKey('error')) {
+          throw Exception(data['error']);
+        }
+      }
+      throw Exception('Lỗi tải video từ link: ${e.message}');
+    }
+  }
 }

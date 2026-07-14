@@ -106,4 +106,9 @@ class VideoRepositoryImpl implements VideoRepository {
     }
     throw Exception(result['error'] ?? 'Không thể dịch lại kịch bản');
   }
+
+  @override
+  Future<Map<String, dynamic>> downloadVideo(String url) async {
+    return await apiClient.downloadVideo(url);
+  }
 }
