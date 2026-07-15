@@ -1168,18 +1168,6 @@ router.post('/download', async (req, res) => {
 
   try {
     const videoPath = await downloadVideo(url, VIDEOS_DIR, videoId);
-    
-    // Slow down the downloaded video to 0.7x in-place using ffmpeg
-    const ffmpeg = getFfmpegCommand();
-    const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
-    const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow.mp4`);
-    console.log(`[api/download] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
-    const { execSync } = require('child_process');
-    execSync(slowCmd);
-    fs.unlinkSync(videoPath);
-    fs.renameSync(tempSlowPath, videoPath);
-
     const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
     await extractAudio(videoPath, audioPath);
 
@@ -1217,16 +1205,6 @@ router.post('/upload', upload.single('video'), async (req, res) => {
       fs.unlinkSync(videoPath);
       return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
     }
-
-    // Slow down the uploaded video to 0.7x in-place using ffmpeg
-    const ffmpeg = getFfmpegCommand();
-    const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
-    const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow${path.extname(req.file.filename)}`);
-    console.log(`[api/upload] Slowing down video to 0.7x speed: ${videoPath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
-    execSync(slowCmd);
-    fs.unlinkSync(videoPath);
-    fs.renameSync(tempSlowPath, videoPath);
 
     await extractAudio(videoPath, audioPath);
 
@@ -1302,7 +1280,42 @@ router.post('/transcribe', async (req, res) => {
           };
         }
 
-        const subtitles = await transcribeSegmented(audioPath, {
+        let finalAudioPath = audioPath;
+        let finalVideoPath = videoPath;
+
+        if (videoPath && fs.existsSync(videoPath)) {
+          const videoDir = path.dirname(videoPath);
+          const videoExt = path.extname(videoPath);
+          const videoBase = path.basename(videoPath, videoExt);
+
+          if (!videoBase.endsWith('_slow')) {
+            global.transcribeProgress[taskId] = {
+              status: 'transcribing',
+              percent: 8,
+              message: 'Đang kéo giãn thời lượng video sang 0.7x...'
+            };
+
+            const slowVideoName = `${videoBase}_slow${videoExt}`;
+            const slowAudioName = `${videoBase}_slow.mp3`;
+            const slowVideoPath = path.join(videoDir, slowVideoName);
+            const slowAudioPath = path.join(AUDIOS_DIR, slowAudioName);
+
+            const ffmpeg = getFfmpegCommand();
+            const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+
+            console.log(`[api/transcribe] Slowing down video and audio to 0.7x: ${videoPath} -> ${slowVideoPath}`);
+            const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${slowVideoPath}"`;
+            const { execSync } = require('child_process');
+            execSync(slowCmd);
+
+            await extractAudio(slowVideoPath, slowAudioPath);
+
+            finalVideoPath = slowVideoPath;
+            finalAudioPath = slowAudioPath;
+          }
+        }
+
+        const subtitles = await transcribeSegmented(finalAudioPath, {
           acquireKey,
           reportBadKey,
           onProgress: ({ percent, message }) => {
@@ -1312,7 +1325,7 @@ router.post('/transcribe', async (req, res) => {
 
         // Auto-detect subtitle Y position using Gemini on a keyframe
         let detectedPosition = null;
-        if (videoPath && subtitles && subtitles.length > 0) {
+        if (finalVideoPath && subtitles && subtitles.length > 0) {
           global.transcribeProgress[taskId] = {
             status: 'transcribing',
             percent: 99,
@@ -1341,15 +1354,15 @@ router.post('/transcribe', async (req, res) => {
               const midSec = (start + end) / 2;
 
               const activeKey = await acquireKey();
-              detectedPosition = await detectSubtitlePosition(videoPath, midSec, activeKey);
+              detectedPosition = await detectSubtitlePosition(finalVideoPath, midSec, activeKey);
             }
           } catch (detError) {
             console.warn('[api/transcribe] Failed to automatically detect subtitle Y-coordinate:', detError.message);
           }
         }
 
-        const videoFilename = videoPath ? path.basename(videoPath) : '';
-        const audioFilename = audioPath ? path.basename(audioPath) : '';
+        const videoFilename = finalVideoPath ? path.basename(finalVideoPath) : '';
+        const audioFilename = finalAudioPath ? path.basename(finalAudioPath) : '';
         const videoUrl = videoFilename ? getFullUrl(req, `/downloads/videos/${videoFilename}`) : '';
         const audioUrl = audioFilename ? getFullUrl(req, `/downloads/audios/${audioFilename}`) : '';
 
@@ -1359,8 +1372,8 @@ router.post('/transcribe', async (req, res) => {
           percent: 100,
           subtitles,
           detectedPosition,
-          videoPath,
-          audioPath,
+          videoPath: finalVideoPath,
+          audioPath: finalAudioPath,
           videoUrl,
           audioUrl
         };
@@ -1720,21 +1733,14 @@ router.post('/load-split-segment', async (req, res) => {
   const videoId = uuidv4();
   const videoExt = path.extname(filePath);
   
-  // Copy and slow down the split file into downloads/videos
+  // Copy the split file into downloads/videos
   const targetVideoPath = path.join(VIDEOS_DIR, `${videoId}${videoExt}`);
-  const tempSlowPath = path.join(VIDEOS_DIR, `${videoId}_slow${videoExt}`);
-  const ffmpeg = getFfmpegCommand();
-  const safeFfmpeg = ffmpeg.includes(' ') ? `"${ffmpeg}"` : ffmpeg;
+  fs.copyFileSync(filePath, targetVideoPath);
 
   // Extract audio
   const audioPath = path.join(AUDIOS_DIR, `${videoId}.mp3`);
   
   try {
-    console.log(`[api/load-split-segment] Slowing down split segment to 0.7x speed: ${filePath} -> ${tempSlowPath}`);
-    const slowCmd = `${safeFfmpeg} -y -i "${filePath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${tempSlowPath}"`;
-    execSync(slowCmd);
-    fs.renameSync(tempSlowPath, targetVideoPath);
-
     await extractAudio(targetVideoPath, audioPath);
 
     res.json({
