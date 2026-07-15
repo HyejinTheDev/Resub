@@ -7,6 +7,7 @@ import '../../../core/constants/colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
 import '../../bloc/auth/auth_state.dart';
+import '../../../core/utils/web_storage.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -642,26 +643,71 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                               const SizedBox(height: 20),
 
-                              // Google Sign-In Button
-                              OutlinedButton.icon(
-                                onPressed: isLoading ? null : _loginWithGoogle,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  backgroundColor: Colors.white.withValues(alpha: 0.02),
+                              // Check if running in iframe (Hugging Face embed)
+                              if (WebStorage.isIframe()) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.1),
+                                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Lưu ý khi Đăng nhập Google:',
+                                            style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                        'Hugging Face chặn cửa sổ xác thực khi chạy trong khung nhúng (iframe). Vui lòng bấm nút dưới đây để mở trang trực tiếp ở tab mới và đăng nhập.',
+                                        style: TextStyle(color: Colors.white70, fontSize: 10, height: 1.4),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      ElevatedButton.icon(
+                                        onPressed: () => WebStorage.openInNewTab(''),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber,
+                                          foregroundColor: Colors.black,
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                        ),
+                                        icon: const Icon(Icons.open_in_new, size: 12),
+                                        label: const Text('MỞ TRANG CHỦ TRỰC TIẾP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                icon: Image.network(
-                                  'g-logo.png',
-                                  height: 18,
-                                  width: 18,
+                                const SizedBox(height: 16),
+                              ] else ...[
+                                // Google Sign-In Button
+                                OutlinedButton.icon(
+                                  onPressed: isLoading ? null : _loginWithGoogle,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    backgroundColor: Colors.white.withValues(alpha: 0.02),
+                                  ),
+                                  icon: Image.network(
+                                    'g-logo.png',
+                                    height: 18,
+                                    width: 18,
+                                  ),
+                                  label: const Text(
+                                    'Đăng nhập bằng Google',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+                                  ),
                                 ),
-                                label: const Text(
-                                  'Đăng nhập bằng Google',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.2),
-                                ),
-                              ),
+                              ],
                             ],
                           ],
                         ),

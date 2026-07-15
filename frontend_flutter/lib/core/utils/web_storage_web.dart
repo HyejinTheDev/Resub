@@ -22,3 +22,18 @@ void clearUserDataImpl() {
     html.window.name = '';
   } catch (_) {}
 }
+
+bool isIframeImpl() {
+  try {
+    return html.window.self != html.window.top;
+  } catch (_) {
+    return true;
+  }
+}
+
+void openInNewTabImpl(String url) {
+  try {
+    final targetUrl = url.isNotEmpty ? url : html.window.location.href;
+    html.window.open(targetUrl, '_blank');
+  } catch (_) {}
+}

@@ -13,4 +13,12 @@ class WebStorage {
   static void clearUserData() {
     clearUserDataImpl();
   }
+
+  static bool isIframe() {
+    return isIframeImpl();
+  }
+
+  static void openInNewTab(String url) {
+    openInNewTabImpl(url);
+  }
 }
