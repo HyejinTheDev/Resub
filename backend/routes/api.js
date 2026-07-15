@@ -1134,9 +1134,14 @@ function extractAudio(videoPath, audioPath) {
     ];
 
     console.log(`[server] Extracting audio: ${ffmpeg} ${args.join(' ')}`);
-    const proc = spawn(ffmpeg, args);
+    const proc = spawn(ffmpeg, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
+    proc.stdout.on('data', () => {});
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('error', (err) => {
+      console.error('[server] extractAudio spawn error:', err);
+      reject(err);
+    });
     proc.on('close', (code) => {
       if (code === 0) {
         resolve(audioPath);
