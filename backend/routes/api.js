@@ -67,6 +67,21 @@ function writeUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+// Helper to reset user quota if 24 hours have passed
+async function checkAndUpdateUserQuota(user) {
+  if (!user) return user;
+  const now = new Date();
+  const lastReset = user.lastQuotaReset || user.createdAt || now;
+  const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceReset >= 24) {
+    user.videoExportUsed = 0;
+    user.lastQuotaReset = now;
+    await user.save();
+    console.log(`[quota] Reset quota for user ${user.username} after ${hoursSinceReset.toFixed(1)} hours.`);
+  }
+  return user;
+}
+
 // Auth endpoints
 router.post('/auth/register', async (req, res) => {
   if (mongoose.connection.readyState !== 1) {
@@ -177,6 +192,8 @@ router.post('/auth/verify-otp', async (req, res) => {
     user.otpCode = undefined;
     user.otpExpires = undefined;
     await user.save();
+
+    await checkAndUpdateUserQuota(user);
 
     res.json({
       success: true,
@@ -302,6 +319,8 @@ router.post('/auth/login', async (req, res) => {
         email: user.email
       });
     }
+
+    await checkAndUpdateUserQuota(user);
 
     res.json({
       success: true,
@@ -431,6 +450,8 @@ router.post('/auth/google', async (req, res) => {
       console.log(`[Google Auth] Logged in existing user: ${user.username} (${email})`);
     }
 
+    await checkAndUpdateUserQuota(user);
+
     res.json({
       success: true,
       user: {
@@ -466,6 +487,8 @@ router.get('/auth/profile', async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'Người dùng không tồn tại' });
     }
+
+    await checkAndUpdateUserQuota(user);
 
     res.json({
       success: true,
@@ -1409,6 +1432,7 @@ router.post('/dub', async (req, res) => {
     try {
       user = await User.findById(userId);
       if (user) {
+        await checkAndUpdateUserQuota(user);
         const used = user.videoExportUsed || 0;
         const quota = user.videoExportQuota || 10;
         if (used >= quota) {
