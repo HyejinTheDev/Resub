@@ -1032,6 +1032,10 @@ const KEY_MANAGER_URL = process.env.KEY_MANAGER_URL || 'http://localhost:3060';
 const KEY_MANAGER_TOKEN = process.env.KEY_MANAGER_TOKEN || 'resub_secret_key_rotation_token_123';
 
 async function fetchKeyFromManager() {
+  if (process.env.GEMINI_API_KEY) {
+    return process.env.GEMINI_API_KEY;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
 
@@ -1050,10 +1054,11 @@ async function fetchKeyFromManager() {
     return data.apiKey;
   } catch (err) {
     clearTimeout(timeoutId);
+    let errorMsg = 'Không thể kết nối tới KeyManager. Vui lòng cấu hình biến GEMINI_API_KEY trong cài đặt Space hoặc tắt nút gạt "Dùng kho Key hệ thống" trên giao diện để nhập Key thủ công.';
     if (err.name === 'AbortError') {
-      throw new Error('Kết nối tới KeyManager bị quá thời gian (Timeout). Vui lòng thử lại.');
+      errorMsg = 'Kết nối tới KeyManager bị quá thời gian (Timeout). Vui lòng cấu hình biến GEMINI_API_KEY trong cài đặt Space hoặc tắt nút gạt "Dùng kho Key hệ thống" trên giao diện để nhập Key thủ công.';
     }
-    throw err;
+    throw new Error(errorMsg);
   }
 }
 
@@ -1417,17 +1422,22 @@ router.post('/transcribe', async (req, res) => {
 
 // Endpoint to poll transcription progress status
 router.get('/transcribe-status', (req, res) => {
-  const { taskId } = req.query;
-  if (!taskId) {
-    return res.status(400).json({ error: 'taskId is required' });
-  }
+  try {
+    const { taskId } = req.query;
+    if (!taskId) {
+      return res.status(400).json({ error: 'taskId is required' });
+    }
 
-  const progress = global.transcribeProgress[taskId];
-  if (!progress) {
-    return res.status(404).json({ error: 'Task not found' });
-  }
+    const progress = global.transcribeProgress[taskId];
+    if (!progress) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
 
-  res.json(progress);
+    res.json(progress);
+  } catch (error) {
+    console.error('[api/transcribe-status] Route handler crashed:', error);
+    res.status(500).json({ error: `Route handler crashed: ${error.message}` });
+  }
 });
 
 // 4. Dub & Export (Async background task — the HTTP request returns immediately
