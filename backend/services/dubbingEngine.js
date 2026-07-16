@@ -579,8 +579,8 @@ async function getAudioDuration(filePath) {
  */
 async function adjustAudioSpeed(inputPath, outputPath, speed) {
   return new Promise((resolve, reject) => {
-    // Clamp speed between 0.5 and 1.4 (Natural speech limit to avoid distortion)
-    const clampedSpeed = Math.min(Math.max(speed, 0.5), 1.4);
+    // Clamp speed between 0.8 and 1.2 (Natural speech limit to avoid distortion)
+    const clampedSpeed = Math.min(Math.max(speed, 0.8), 1.2);
     const ffmpeg = getFfmpegCommand();
     
     // If speed is very close to 1.0, just copy the file
@@ -861,11 +861,21 @@ async function exportDubbedVideo({
         await generateTTS(task.sub.text, task.sub.voice || voice, rawTtsPath, capcutCookie);
         const ttsDuration = await getMediaDurationFast(rawTtsPath);
 
-        // Speed up TTS when it overflows the original subtitle interval
-        let speed = 1.0;
-        if (ttsDuration > task.originalDuration) {
-          speed = ttsDuration / task.originalDuration;
+        // Calculate maximum allowed duration to avoid overlapping the next subtitle (Silence Borrowing)
+        let maxDuration = task.originalDuration;
+        if (task.index < subtitles.length - 1) {
+          const nextSub = subtitles[task.index + 1];
+          const nextStartMs = parseTimeToMs(nextSub.startTime);
+          // Borrow silence up to the start of the next subtitle, leaving a 150ms gap
+          const maxBorrowMs = nextStartMs - task.startMs - 150;
+          maxDuration = Math.max(task.originalDuration, maxBorrowMs / 1000);
         }
+
+        let speed = 1.0;
+        if (ttsDuration > maxDuration) {
+          speed = ttsDuration / maxDuration;
+        }
+
         if (Math.abs(speed - 1.0) < 0.05) {
           task.path = rawTtsPath;
         } else {

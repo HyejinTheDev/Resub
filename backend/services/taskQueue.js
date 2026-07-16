@@ -118,13 +118,13 @@ function envInt(name, fallback) {
 }
 
 const exportQueue = new TaskQueue('export', {
-  maxConcurrent: envInt('MAX_CONCURRENT_EXPORTS', 2),
-  maxQueue: envInt('MAX_QUEUE_EXPORTS', 15)
+  maxConcurrent: envInt('MAX_CONCURRENT_EXPORTS', 1),
+  maxQueue: envInt('MAX_QUEUE_EXPORTS', 5)
 });
 
 const transcribeQueue = new TaskQueue('transcribe', {
-  maxConcurrent: envInt('MAX_CONCURRENT_TRANSCRIBE', 2),
-  maxQueue: envInt('MAX_QUEUE_TRANSCRIBE', 15)
+  maxConcurrent: envInt('MAX_CONCURRENT_TRANSCRIBE', 1),
+  maxQueue: envInt('MAX_QUEUE_TRANSCRIBE', 5)
 });
 
 module.exports = { TaskQueue, exportQueue, transcribeQueue };

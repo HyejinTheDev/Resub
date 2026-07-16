@@ -16,10 +16,14 @@ const SUBTITLE_SCHEMA = {
   }
 };
 
-// Prioritize gemini-1.5-flash as the most stable and available model.
-const TRANSCRIBE_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.5-flash'
+// Prioritize models, supporting environment override
+const envModels = process.env.GEMINI_TRANSCRIBE_MODELS
+  ? process.env.GEMINI_TRANSCRIBE_MODELS.split(',').map(m => m.trim())
+  : null;
+
+const TRANSCRIBE_MODELS = envModels || [
+  'gemini-2.5-flash',
+  'gemini-1.5-flash'
 ];
 
 /**
@@ -143,7 +147,7 @@ async function detectSubtitlePosition(videoPath, timestampSec, apiKey) {
     const frameBuffer = fs.readFileSync(tempFramePath);
     const base64Frame = frameBuffer.toString('base64');
 
-    const model = 'gemini-1.5-flash';
+    const model = TRANSCRIBE_MODELS[0];
     console.log(`[geminiService] Detecting subtitle position using model: ${model} at ${timestampSec.toFixed(2)}s...`);
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
