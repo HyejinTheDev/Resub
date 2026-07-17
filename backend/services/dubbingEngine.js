@@ -845,7 +845,7 @@ async function exportDubbedVideo({
     }
 
     const usesCapcutVoice = ttsTasks.some(t => (t.sub.voice || voice).startsWith('capcut-'));
-    const concurrency = Math.max(1, Math.min(usesCapcutVoice ? 4 : 10, ttsTasks.length));
+    const concurrency = Math.max(1, Math.min(usesCapcutVoice ? 8 : 12, ttsTasks.length));
     let completedCount = 0;
     let nextTaskIdx = 0;
 
