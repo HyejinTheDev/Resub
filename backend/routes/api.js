@@ -1315,8 +1315,17 @@ router.post('/transcribe', async (req, res) => {
 
             console.log(`[api/transcribe] Slowing down video and audio to 0.7x: ${videoPath} -> ${slowVideoPath}`);
             const slowCmd = `${safeFfmpeg} -y -i "${videoPath}" -filter_complex "[0:v]setpts=1.4286*PTS[v];[0:a]atempo=0.7[a]" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "${slowVideoPath}"`;
-            const { execSync } = require('child_process');
-            execSync(slowCmd);
+            const { exec } = require('child_process');
+            await new Promise((resolve, reject) => {
+              exec(slowCmd, (error) => {
+                if (error) {
+                  console.error('[api/transcribe] slowCmd error:', error);
+                  reject(error);
+                } else {
+                  resolve();
+                }
+              });
+            });
 
             await extractAudio(slowVideoPath, slowAudioPath);
 
