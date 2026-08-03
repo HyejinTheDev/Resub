@@ -664,7 +664,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'AI viết lời, đọc giọng và xuất video YouTube 16:9',
+                  'AI đọc ảnh và viết nội dung review hoàn chỉnh',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
