@@ -554,7 +554,7 @@ class _ImportScreenState extends State<ImportScreen> {
             ),
             SizedBox(height: 4),
             Text(
-              'Hỗ trợ các định dạng .mp4, .mov (Tối đa 5 phút)',
+              'Hỗ trợ các định dạng .mp4, .mov (Không giới hạn thời lượng)',
               style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ],

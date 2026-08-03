@@ -1094,9 +1094,10 @@ const storage = multer.diskStorage({
     cb(null, `${uniqueId}${path.extname(file.originalname)}`);
   }
 });
+const maxUploadMb = Math.max(1, parseInt(process.env.MAX_UPLOAD_MB || '1024', 10) || 1024);
 const upload = multer({
   storage,
-  limits: { fileSize: 150 * 1024 * 1024 } // 150 MB max upload per file
+  limits: { fileSize: maxUploadMb * 1024 * 1024 }
 });
 
 function getFfmpegCommand() {
@@ -1211,11 +1212,6 @@ router.post('/upload', upload.single('video'), async (req, res) => {
   try {
     const durationCmd = `${safeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
     const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
-
-    if (duration > 300) {
-      fs.unlinkSync(videoPath);
-      return res.status(400).json({ error: 'Video quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
-    }
 
     await extractAudio(videoPath, audioPath);
 
@@ -1498,19 +1494,6 @@ router.post('/dub', async (req, res) => {
   const exportId = uuidv4();
   const outputPath = path.join(EXPORTS_DIR, `${exportId}.mp4`);
   console.log(`[api/dub] Starting background dubbing export ${exportId} for ${videoPath}...`);
-
-  try {
-    const ffprobe = getFfprobeCommand();
-    const safeFfprobe = ffprobe.includes(' ') ? `"${ffprobe}"` : ffprobe;
-    const durationCmd = `${safeFfprobe} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
-    const duration = parseFloat(execSync(durationCmd).toString().trim()) || 0;
-
-    if (duration > 300) {
-      return res.status(400).json({ error: 'Video xuất quá dài! Thời lượng tối đa cho phép là 5 phút (300 giây).' });
-    }
-  } catch (error) {
-    return res.status(500).json({ error: `Không đọc được thông tin video: ${error.message}` });
-  }
 
   if (!exportQueue.hasCapacity()) {
     return res.status(503).json({
