@@ -64,20 +64,16 @@ class _ImportScreenState extends State<ImportScreen> {
       },
       cropStyle: const {},
       videoTransform: const {},
-      videoData: {
-        'projectId': projId,
-        'projectName': roomName,
-        'videoUrl': '',
-      },
+      videoData: {'projectId': projId, 'projectName': roomName, 'videoUrl': ''},
       storyboard: const {},
     );
 
     // Save to local storage
     context.read<ProjectBloc>().add(SaveCurrentProjectEvent(project));
-    
+
     // Initialize in Workspace
     context.read<WorkspaceBloc>().add(LoadProjectWorkspaceEvent(project));
-    
+
     // Redirect to Workspace
     Navigator.pushReplacementNamed(context, '/workspace');
   }
@@ -156,7 +152,9 @@ class _ImportScreenState extends State<ImportScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Chia nhỏ video thành ${_splitSegments.length} phần thành công!'),
+            content: Text(
+              'Chia nhỏ video thành ${_splitSegments.length} phần thành công!',
+            ),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -178,11 +176,13 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   void _loadSegment(String filePath) {
-    context.read<ImportBloc>().add(LoadSegmentAndTranscribeEvent(
-          filePath: filePath,
-          geminiKey: _useSystemPool ? null : _apiKeyController.text,
-          useSystemPool: _useSystemPool,
-        ));
+    context.read<ImportBloc>().add(
+      LoadSegmentAndTranscribeEvent(
+        filePath: filePath,
+        geminiKey: _useSystemPool ? null : _apiKeyController.text,
+        useSystemPool: _useSystemPool,
+      ),
+    );
   }
 
   Future<void> _downloadSegment(String url) async {
@@ -224,6 +224,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
             final Widget splitterCard = _buildSplitterCard(context, state);
             final Widget importCard = _buildImportCard(context, state);
+            final Widget comicReviewCard = _buildComicReviewCard(context);
 
             if (isDesktop) {
               return SingleChildScrollView(
@@ -238,6 +239,8 @@ class _ImportScreenState extends State<ImportScreen> {
                           Expanded(child: splitterCard),
                           const SizedBox(width: 24),
                           Expanded(child: importCard),
+                          const SizedBox(width: 24),
+                          Expanded(child: comicReviewCard),
                         ],
                       ),
                     ),
@@ -253,6 +256,8 @@ class _ImportScreenState extends State<ImportScreen> {
                     splitterCard,
                     const SizedBox(height: 20),
                     importCard,
+                    const SizedBox(height: 20),
+                    comicReviewCard,
                   ],
                 ),
               );
@@ -264,7 +269,8 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Widget _buildSplitterCard(BuildContext context, ImportState state) {
-    final bool isProcessing = state is ImportUploading || state is ImportTranscribing;
+    final bool isProcessing =
+        state is ImportUploading || state is ImportTranscribing;
 
     return Card(
       elevation: 4,
@@ -287,7 +293,11 @@ class _ImportScreenState extends State<ImportScreen> {
             const SizedBox(height: 12),
             const Text(
               'Chia nhỏ tệp video dài thành các phần đều nhau liên tục (sử dụng FFmpeg copy trực tiếp, không nén lại nên cực kỳ nhanh và giữ nguyên 100% chất lượng gốc).',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textMuted,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -298,24 +308,39 @@ class _ImportScreenState extends State<ImportScreen> {
                 child: Container(
                   height: 150,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                    border: Border.all(
+                      color: AppColors.border,
+                      style: BorderStyle.solid,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                     color: Colors.white.withValues(alpha: 0.01),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.folder_open, size: 40, color: AppColors.textMuted),
+                      const Icon(
+                        Icons.folder_open,
+                        size: 40,
+                        color: AppColors.textMuted,
+                      ),
                       const SizedBox(height: 10),
                       Text(
-                        _splitFile != null ? 'Đã chọn: ${_splitFile!.name}' : 'Kéo thả hoặc chọn file video cần cắt nhỏ',
+                        _splitFile != null
+                            ? 'Đã chọn: ${_splitFile!.name}'
+                            : 'Kéo thả hoặc chọn file video cần cắt nhỏ',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       const Text(
                         'Hỗ trợ MP4, MKV, AVI, v.v.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
                       ),
                     ],
                   ),
@@ -326,27 +351,45 @@ class _ImportScreenState extends State<ImportScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Thời lượng mỗi phần:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Thời lượng mỗi phần:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     SizedBox(
                       width: 80,
                       height: 36,
                       child: TextField(
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 13),
                         decoration: InputDecoration(
                           contentPadding: EdgeInsets.zero,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
-                        controller: TextEditingController(text: _segmentMinutes.toString()),
+                        controller: TextEditingController(
+                          text: _segmentMinutes.toString(),
+                        ),
                         onChanged: (val) {
                           _segmentMinutes = double.tryParse(val) ?? 5.0;
                         },
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('phút', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                    const Text(
+                      'phút',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -358,7 +401,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   ),
                   child: const Text('BẮT ĐẦU CẮT VIDEO'),
                 ),
-              ]
+              ],
             ] else if (_isSplitting) ...[
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -368,18 +411,25 @@ class _ImportScreenState extends State<ImportScreen> {
                     const SizedBox(height: 16),
                     Text(
                       _splittingStatus,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
-              )
+              ),
             ] else if (_splitSegments.isNotEmpty) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'Kết quả: ${_splitSegments.length} phần',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
@@ -388,7 +438,10 @@ class _ImportScreenState extends State<ImportScreen> {
                         _splitSegments = [];
                       });
                     },
-                    child: const Text('Cắt video khác', style: TextStyle(decoration: TextDecoration.underline)),
+                    child: const Text(
+                      'Cắt video khác',
+                      style: TextStyle(decoration: TextDecoration.underline),
+                    ),
                   ),
                 ],
               ),
@@ -400,8 +453,10 @@ class _ImportScreenState extends State<ImportScreen> {
                 separatorBuilder: (context, idx) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final seg = _splitSegments[index];
-                  final double duration = (seg['duration'] as num?)?.toDouble() ?? 0.0;
-                  final durationStr = '${(duration / 60).floor()}p ${(duration % 60).round()}s';
+                  final double duration =
+                      (seg['duration'] as num?)?.toDouble() ?? 0.0;
+                  final durationStr =
+                      '${(duration / 60).floor()}p ${(duration % 60).round()}s';
 
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -421,12 +476,18 @@ class _ImportScreenState extends State<ImportScreen> {
                                 seg['fileName'] ?? '',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Thời lượng: $durationStr',
-                                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                ),
                               ),
                             ],
                           ),
@@ -437,22 +498,41 @@ class _ImportScreenState extends State<ImportScreen> {
                             ElevatedButton(
                               onPressed: () => _downloadSegment(seg['url']),
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 minimumSize: Size.zero,
-                                backgroundColor: Colors.white.withValues(alpha: 0.05),
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.05,
+                                ),
                               ),
-                              child: const Text('Tải về', style: TextStyle(fontSize: 11)),
+                              child: const Text(
+                                'Tải về',
+                                style: TextStyle(fontSize: 11),
+                              ),
                             ),
                             const SizedBox(width: 6),
                             ElevatedButton(
-                              onPressed: isProcessing ? null : () => _loadSegment(seg['filePath']),
+                              onPressed: isProcessing
+                                  ? null
+                                  : () => _loadSegment(seg['filePath']),
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 minimumSize: Size.zero,
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.black,
                               ),
-                              child: const Text('Lồng tiếng', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              child: const Text(
+                                'Lồng tiếng',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -460,8 +540,8 @@ class _ImportScreenState extends State<ImportScreen> {
                     ),
                   );
                 },
-              )
-            ]
+              ),
+            ],
           ],
         ),
       ),
@@ -533,6 +613,72 @@ class _ImportScreenState extends State<ImportScreen> {
     );
   }
 
+  Widget _buildComicReviewCard(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, '/comic-review'),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.auto_stories_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Review truyện tranh',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'AI viết lời, đọc giọng và xuất video YouTube 16:9',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUploadPlaceholder(BuildContext context) {
     return InkWell(
       onTap: () => _pickVideo(context),
@@ -576,7 +722,10 @@ class _ImportScreenState extends State<ImportScreen> {
                 file.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 2),
               FutureBuilder<int>(
@@ -585,7 +734,10 @@ class _ImportScreenState extends State<ImportScreen> {
                   final size = snapshot.data ?? 0;
                   return Text(
                     _getFileSizeString(size),
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
                   );
                 },
               ),
@@ -631,7 +783,11 @@ class _ImportScreenState extends State<ImportScreen> {
           const SizedBox(height: 12),
           const Text(
             'Nhập API Key AI của bạn:',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -640,7 +796,10 @@ class _ImportScreenState extends State<ImportScreen> {
             obscureText: true,
             decoration: const InputDecoration(
               hintText: 'AIzaSy...',
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
           ),
         ],
@@ -651,10 +810,12 @@ class _ImportScreenState extends State<ImportScreen> {
   Widget _buildStartButton(BuildContext context) {
     return ElevatedButton(
       onPressed: () {
-        context.read<ImportBloc>().add(StartUploadAndTranscribeEvent(
-              geminiKey: _useSystemPool ? null : _apiKeyController.text,
-              useSystemPool: _useSystemPool,
-            ));
+        context.read<ImportBloc>().add(
+          StartUploadAndTranscribeEvent(
+            geminiKey: _useSystemPool ? null : _apiKeyController.text,
+            useSystemPool: _useSystemPool,
+          ),
+        );
       },
       child: const Text('BẮT ĐẦU DỊCH VIDEO'),
     );
@@ -693,7 +854,11 @@ class _ImportScreenState extends State<ImportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.check_circle_outline, color: AppColors.primary, size: 56),
+        const Icon(
+          Icons.check_circle_outline,
+          color: AppColors.primary,
+          size: 56,
+        ),
         const SizedBox(height: 16),
         const Text(
           'Dịch Video Thành Công!',
@@ -709,16 +874,16 @@ class _ImportScreenState extends State<ImportScreen> {
         const SizedBox(height: 24),
         ElevatedButton(
           onPressed: () {
-            context.read<WorkspaceBloc>().add(InitializeWorkspaceEvent(
-                  subtitles: state.subtitles,
-                  detectedY: state.detectedY,
-                  detectedHeight: state.detectedHeight,
-                  videoData: state.videoData,
-                ));
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const WorkspaceScreen(),
+            context.read<WorkspaceBloc>().add(
+              InitializeWorkspaceEvent(
+                subtitles: state.subtitles,
+                detectedY: state.detectedY,
+                detectedHeight: state.detectedHeight,
+                videoData: state.videoData,
               ),
+            );
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const WorkspaceScreen()),
             );
           },
           child: const Text('TIẾP TỤC VÀO PHÒNG LÀM VIỆC'),
@@ -737,9 +902,13 @@ class _ImportScreenState extends State<ImportScreen> {
   Widget _buildFailureCard(BuildContext context, String error) {
     String friendlyError = error;
     if (error.contains('503')) {
-      friendlyError = 'Máy chủ dịch thuật đang khởi động hoặc quá tải (Lỗi 503). Vui lòng chờ 1 phút rồi bấm THỬ LẠI để thực hiện lại.';
-    } else if (error.contains('404') || error.toLowerCase().contains('not found') || error.toLowerCase().contains('không tìm thấy')) {
-      friendlyError = 'Không tìm thấy tệp video trên máy chủ (Lỗi 404 - có thể máy chủ vừa khởi động lại). Vui lòng bấm THỬ LẠI để tải lên video từ đầu.';
+      friendlyError =
+          'Máy chủ dịch thuật đang khởi động hoặc quá tải (Lỗi 503). Vui lòng chờ 1 phút rồi bấm THỬ LẠI để thực hiện lại.';
+    } else if (error.contains('404') ||
+        error.toLowerCase().contains('not found') ||
+        error.toLowerCase().contains('không tìm thấy')) {
+      friendlyError =
+          'Không tìm thấy tệp video trên máy chủ (Lỗi 404 - có thể máy chủ vừa khởi động lại). Vui lòng bấm THỬ LẠI để tải lên video từ đầu.';
     }
 
     return Column(

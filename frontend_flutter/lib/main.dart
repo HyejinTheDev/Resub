@@ -21,22 +21,25 @@ import 'presentation/screens/dashboard/project_dashboard_screen.dart';
 import 'presentation/screens/workspace/workspace_screen.dart';
 import 'presentation/screens/workspace/player/platform_view_helper.dart';
 import 'presentation/screens/landing/landing_screen.dart';
+import 'presentation/screens/comic_review/comic_review_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   registerBlurMaskViewFactories();
-  
+
   // Initialize API and Repositories for dependency injection
   final apiClient = ApiClient();
   final videoRepository = VideoRepositoryImpl(apiClient: apiClient);
   final authRepository = AuthRepositoryImpl(apiClient: apiClient);
   final projectRepository = ProjectRepositoryImpl();
 
-  runApp(MyApp(
-    videoRepository: videoRepository,
-    authRepository: authRepository,
-    projectRepository: projectRepository,
-  ));
+  runApp(
+    MyApp(
+      videoRepository: videoRepository,
+      authRepository: authRepository,
+      projectRepository: projectRepository,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -62,9 +65,9 @@ class MyApp extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<AuthBloc>(
-            create: (context) => AuthBloc(
-              authRepository: context.read<AuthRepository>(),
-            )..add(AppStartedEvent()),
+            create: (context) =>
+                AuthBloc(authRepository: context.read<AuthRepository>())
+                  ..add(AppStartedEvent()),
           ),
           BlocProvider<ProjectBloc>(
             create: (context) => ProjectBloc(
@@ -72,13 +75,10 @@ class MyApp extends StatelessWidget {
             ),
           ),
           BlocProvider<ImportBloc>(
-            create: (context) => ImportBloc(
-              videoRepository: context.read<VideoRepository>(),
-            ),
+            create: (context) =>
+                ImportBloc(videoRepository: context.read<VideoRepository>()),
           ),
-          BlocProvider<WorkspaceBloc>(
-            create: (context) => WorkspaceBloc(),
-          ),
+          BlocProvider<WorkspaceBloc>(create: (context) => WorkspaceBloc()),
         ],
         child: MaterialApp(
           title: 'RESUB — Auto Dubbing App',
@@ -88,19 +88,22 @@ class MyApp extends StatelessWidget {
           routes: {
             '/': (context) => const LandingScreen(),
             '/dashboard': (context) => BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    if (state is AuthLoading) {
-                      return const Scaffold(
-                        body: Center(
-                          child: CircularProgressIndicator(color: AppColors.primary),
-                        ),
-                      );
-                    }
-                    return const ProjectDashboardScreen();
-                  },
-                ),
+              builder: (context, state) {
+                if (state is AuthLoading) {
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  );
+                }
+                return const ProjectDashboardScreen();
+              },
+            ),
             '/login': (context) => const AuthScreen(),
             '/workspace': (context) => const WorkspaceScreen(),
+            '/comic-review': (context) => const ComicReviewScreen(),
           },
         ),
       ),

@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart';
 
 class ApiClient {
   final Dio _dio;
-  
+
   // Default URL pointing to local server.
   // Can be dynamically changed to Hugging Face space URL in settings.
   String _baseUrl = 'http://localhost:3051';
@@ -32,14 +32,14 @@ class ApiClient {
   }
 
   /// Upload video file to backend
-  Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int, int)? onSendProgress}) async {
+  Future<Map<String, dynamic>> uploadVideo(
+    XFile file, {
+    void Function(int, int)? onSendProgress,
+  }) async {
     try {
       final bytes = await file.readAsBytes();
       final FormData formData = FormData.fromMap({
-        "video": MultipartFile.fromBytes(
-          bytes,
-          filename: file.name,
-        ),
+        "video": MultipartFile.fromBytes(bytes, filename: file.name),
       });
 
       final response = await _dio.post(
@@ -104,12 +104,11 @@ class ApiClient {
   }
 
   /// Trigger video export & dubbing complex pass
-  Future<Map<String, dynamic>> startDubbing(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> startDubbing(
+    Map<String, dynamic> payload,
+  ) async {
     try {
-      final response = await _dio.post(
-        '$_baseUrl/api/dub',
-        data: payload,
-      );
+      final response = await _dio.post('$_baseUrl/api/dub', data: payload);
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null && e.response?.data != null) {
@@ -141,14 +140,15 @@ class ApiClient {
   }
 
   /// Split a long video file into segments
-  Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int, int)? onSendProgress}) async {
+  Future<Map<String, dynamic>> splitVideo(
+    XFile file,
+    double segmentMinutes, {
+    void Function(int, int)? onSendProgress,
+  }) async {
     try {
       final bytes = await file.readAsBytes();
       final FormData formData = FormData.fromMap({
-        "video": MultipartFile.fromBytes(
-          bytes,
-          filename: file.name,
-        ),
+        "video": MultipartFile.fromBytes(bytes, filename: file.name),
         "segmentMinutes": segmentMinutes,
       });
 
@@ -219,11 +219,7 @@ class ApiClient {
     try {
       final response = await _dio.post(
         '$_baseUrl/api/auth/register',
-        data: {
-          'username': username,
-          'email': email,
-          'password': password,
-        },
+        data: {'username': username, 'email': email, 'password': password},
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -296,9 +292,7 @@ class ApiClient {
 
   /// Get Google Sign In Client ID configuration
   Future<Map<String, dynamic>> getGoogleConfig() async {
-    final response = await _dio.get(
-      '$_baseUrl/api/auth/google-config',
-    );
+    final response = await _dio.get('$_baseUrl/api/auth/google-config');
     return response.data as Map<String, dynamic>;
   }
 
@@ -368,11 +362,7 @@ class ApiClient {
     try {
       final response = await _dio.post(
         '$_baseUrl/api/tts-preview',
-        data: {
-          'text': text,
-          'voice': voice,
-          'capcutCookie': capcutCookie,
-        },
+        data: {'text': text, 'voice': voice, 'capcutCookie': capcutCookie},
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -394,10 +384,7 @@ class ApiClient {
     try {
       final response = await _dio.post(
         '$_baseUrl/api/suggest-storyboard',
-        data: {
-          'subtitles': subtitles,
-          'geminiKey': geminiKey ?? '',
-        },
+        data: {'subtitles': subtitles, 'geminiKey': geminiKey ?? ''},
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -455,5 +442,49 @@ class ApiClient {
       }
       throw Exception('Lỗi tải video từ link: ${e.message}');
     }
+  }
+
+  Future<Map<String, dynamic>> analyzeComicPages(
+    List<XFile> files, {
+    String style = '',
+    void Function(int, int)? onSendProgress,
+  }) async {
+    final uploads = <MultipartFile>[];
+    for (final file in files) {
+      uploads.add(
+        MultipartFile.fromBytes(await file.readAsBytes(), filename: file.name),
+      );
+    }
+    final response = await _dio.post(
+      '$_baseUrl/api/comic-review/analyze',
+      data: FormData.fromMap({'pages': uploads, 'style': style}),
+      onSendProgress: onSendProgress,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> startComicReviewRender(
+    List<Map<String, dynamic>> scenes,
+  ) async {
+    final response = await _dio.post(
+      '$_baseUrl/api/comic-review/render',
+      data: {'scenes': scenes, 'voice': 'capcut-cogaihoatngon'},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> getComicReviewStatus(String exportId) async {
+    final response = await _dio.get(
+      '$_baseUrl/api/comic-review/status',
+      queryParameters: {'exportId': exportId},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> cancelComicReview(String exportId) async {
+    await _dio.post(
+      '$_baseUrl/api/comic-review/cancel',
+      data: {'exportId': exportId},
+    );
   }
 }
