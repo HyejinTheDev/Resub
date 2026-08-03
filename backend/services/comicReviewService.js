@@ -5,7 +5,21 @@ const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const { generateTTS, getFfmpegCommand, getFfprobeCommand } = require('./dubbingEngine');
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const GEMINI_MODELS = [
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash'
+];
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableGeminiFailure(status, message) {
+  return [429, 500, 502, 503, 504].includes(Number(status))
+    || /high demand|overload|temporar|rate.?limit|resource exhausted|try again/i.test(message || '');
+}
 
 function splitImageBatches(imagePaths) {
   const batches = [];
@@ -39,34 +53,44 @@ async function analyzeComicBatch(imagePaths, apiKey, style, pageOffset, previous
 
   const failures = [];
   for (const model of GEMINI_MODELS) {
-    try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        { contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } },
-        { timeout: 180000, maxContentLength: 80 * 1024 * 1024, maxBodyLength: 80 * 1024 * 1024 }
-      );
-      const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!raw) {
-        const reason = response.data?.promptFeedback?.blockReason
-          || response.data?.candidates?.[0]?.finishReason
-          || 'Gemini không trả về nội dung.';
-        throw new Error(`Gemini không thể xử lý lô ảnh này: ${reason}`);
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          { contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } },
+          { timeout: 60000, maxContentLength: 80 * 1024 * 1024, maxBodyLength: 80 * 1024 * 1024 }
+        );
+        const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!raw) {
+          const reason = response.data?.promptFeedback?.blockReason
+            || response.data?.candidates?.[0]?.finishReason
+            || 'Gemini không trả về nội dung.';
+          throw new Error(`Gemini không thể xử lý lô ảnh này: ${reason}`);
+        }
+        const decoded = JSON.parse(raw.trim());
+        const parsed = Array.isArray(decoded) ? decoded : decoded.scenes || decoded.pages || decoded.result;
+        if (!Array.isArray(parsed) || parsed.length !== imagePaths.length) {
+          throw new Error('AI trả về số cảnh không khớp số trang truyện.');
+        }
+        return parsed.map((item, index) => ({ page: pageOffset + index + 1, script: String(item.script || item.text || '').trim() }));
+      } catch (error) {
+        const status = error.response?.status || error.response?.data?.error?.code || 0;
+        const message = error.response?.data?.error?.message || error.message;
+        const retryable = isRetryableGeminiFailure(status, message);
+        failures.push({ model, status, message, retryable });
+        console.warn(`[comicReview] ${model} attempt ${attempt} failed: ${message}`);
+        if (!retryable || attempt >= 2) break;
+        await wait(attempt * 2000);
       }
-      const decoded = JSON.parse(raw.trim());
-      const parsed = Array.isArray(decoded) ? decoded : decoded.scenes || decoded.pages || decoded.result;
-      if (!Array.isArray(parsed) || parsed.length !== imagePaths.length) {
-        throw new Error('AI trả về số cảnh không khớp số trang truyện.');
-      }
-      return parsed.map((item, index) => ({ page: pageOffset + index + 1, script: String(item.script || item.text || '').trim() }));
-    } catch (error) {
-      const status = error.response?.status || error.response?.data?.error?.code || 0;
-      const message = error.response?.data?.error?.message || error.message;
-      failures.push({ model, status, message });
-      console.warn(`[comicReview] ${model} analyze failed: ${message}`);
     }
   }
-  const usefulFailure = failures.find((failure) => failure.status !== 404) || failures[0];
+  const usefulFailure = failures.find((failure) => failure.status !== 404 && !failure.retryable)
+    || failures.find((failure) => failure.status !== 404)
+    || failures[0];
   if (usefulFailure) {
+    if (usefulFailure.retryable) {
+      throw new Error('Các máy chủ Gemini đang quá tải. Hệ thống đã tự thử lại và đổi model nhưng chưa thành công; vui lòng chờ 1-2 phút rồi thử lại.');
+    }
     throw new Error(`${usefulFailure.model}: ${usefulFailure.message}`);
   }
   throw new Error('Không thể phân tích ảnh truyện.');
