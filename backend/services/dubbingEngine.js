@@ -330,7 +330,7 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
   return outputPath;
 }
 
-async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcutCookie = '') {
+async function generateTTS(text, voice = 'capcut-cogaihoatngon', outputPath, capcutCookie = '') {
   const cleanText = (text || '').trim();
   const cleanVoice = (voice || '').trim();
   
@@ -761,7 +761,7 @@ function hexToAssColor(hex) {
 async function exportDubbedVideo({
   videoPath,
   subtitles,
-  voice = 'vi-VN-HoaiMyNeural',
+  voice = 'capcut-cogaihoatngon',
   outputPath,
   bgVolume = 0.15,
   ttsVolume = 1.0,

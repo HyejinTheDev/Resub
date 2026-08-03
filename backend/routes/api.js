@@ -1517,7 +1517,7 @@ router.post('/dub', async (req, res) => {
       await exportDubbedVideo({
         videoPath,
         subtitles,
-        voice: voice || 'vi-VN-HoaiMyNeural',
+        voice: voice || 'capcut-cogaihoatngon',
         outputPath,
         bgVolume: bgVolume !== undefined ? parseFloat(bgVolume) : 0.15,
         ttsVolume: ttsVolume !== undefined ? parseFloat(ttsVolume) : 1.0,
@@ -1636,7 +1636,7 @@ router.post('/tts-preview', async (req, res) => {
     return res.status(400).json({ error: 'Text is required' });
   }
 
-  const voiceName = voice || 'vi-VN-HoaiMyNeural';
+  const voiceName = voice || 'capcut-cogaihoatngon';
   console.log(`[api/tts-preview] Request: text="${text}", voice="${voiceName}", cookieLength=${capcutCookie ? capcutCookie.length : 0}`);
   
   const filename = `${uuidv4()}.mp3`;

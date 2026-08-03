@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/entities/subtitle.dart';
 import '../../../domain/entities/blur_mask.dart';
 
+const String defaultWorkspaceVoice = 'capcut-cogaihoatngon';
+
 class WorkspaceState extends Equatable {
   final List<Subtitle> subtitles;
   final List<BlurMask> blurMasks;
@@ -35,7 +37,7 @@ class WorkspaceState extends Equatable {
     this.storyboard = const {},
     this.bgVolume = 0.15,
     this.ttsVolume = 1.0,
-    this.defaultVoice = 'vi-VN-HoaiMyNeural',
+    this.defaultVoice = defaultWorkspaceVoice,
     this.capcutCookie = '',
     this.subtitleFontSize = 10,
     this.subtitleYPercent = 85,
