@@ -118,7 +118,7 @@ class _ExportTabState extends State<ExportTab> {
       'yPercent': state.subtitleYPercent,
       'color': state.subtitleColor,
       'outlineColor': state.subtitleOutlineColor,
-      'bold': false,
+      'bold': true,
       'italic': false,
     };
 
@@ -132,8 +132,8 @@ class _ExportTabState extends State<ExportTab> {
       'ttsVolume': state.ttsVolume,
       'defaultVoice': state.defaultVoice,
       'capcutCookie': state.capcutCookie,
-      'quality': _quality,
-      'resolution': _resolution,
+      'exportQuality': _quality,
+      'exportResolution': '${_resolution}p',
       'burnSubtitles': _burnSubtitles,
       'videoSpeed': _videoSpeed,
       if (userId != null) 'userId': userId,

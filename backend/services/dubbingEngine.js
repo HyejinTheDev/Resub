@@ -200,7 +200,14 @@ const CAPCUT_VOICES = {
   'capcut-kennydaide': { speaker: 'BV075_streaming_demon_dsp', item_id: '7569442422665661712' }
 };
 
-const PREVIEW_WIDTH = 480;
+// The Flutter editor preview is about 432px high. Scale subtitle styling from
+// video height so exported text keeps the same visual proportions at 480p,
+// 720p and 1080p instead of being enlarged from a fixed 480px-wide preview.
+const SUBTITLE_PREVIEW_REFERENCE_HEIGHT = 432;
+// libass renders larger than Flutter at the same nominal font size. Calibrate
+// its glyph metrics to the editor. Flutter strokeWidth is centered on the
+// glyph edge, whereas an ASS outline expands fully outwards, so use half.
+const ASS_FONT_METRIC_FACTOR = 0.75;
 
 
 async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
@@ -693,13 +700,13 @@ function formatMsToAssTime(ms) {
  * exact center point the editor preview uses — so burned-in subtitles match the
  * position, size and wrap width seen while editing.
  */
-function generateAssFile(subtitles, assPath, { width, height, fontSize, style }) {
+function generateAssFile(subtitles, assPath, { width, height, fontSize, outlineWidth, style }) {
   const s = style || {};
   const primary = hexToAssColor(s.color || '#ffffff');
   const isBoxPreset = s.textColorPreset && s.textColorPreset.includes('-bg');
   const borderStyle = isBoxPreset ? 3 : 1;
   const outlineColour = isBoxPreset ? '&H80000000' : hexToAssColor(s.outlineColor || '#000000');
-  const outline = isBoxPreset ? 2 : (s.outlineWidth !== undefined ? s.outlineWidth : 3.5);
+  const outline = isBoxPreset ? 2 : outlineWidth;
   const bold = s.bold ? -1 : 0;
   const italic = s.italic ? -1 : 0;
 
@@ -721,7 +728,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},2.5,5,${marginH},${marginH},0,1`,
+    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},0,5,${marginH},${marginH},0,1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
@@ -938,17 +945,21 @@ async function exportDubbedVideo({
       }
     }
 
-    // 4. Subtitle file generation — ASS with exact anchor point matching the preview.
-    // The editor preview renders inside a 480px-wide container, so a CSS font of
-    // `fs` px corresponds to fs/480 of the video WIDTH.
+    // 4. Subtitle file generation — ASS calibrated to the Flutter preview.
     const cssFontSize = (subtitleStyle && subtitleStyle.fontSize) || 10;
-    const assFontSize = Math.max(6, Math.round((cssFontSize * 1.5) * (targetWidth / PREVIEW_WIDTH)));
+    const subtitleScale = targetHeight / SUBTITLE_PREVIEW_REFERENCE_HEIGHT;
+    const assFontSize = Math.max(
+      6,
+      Math.round((cssFontSize * 1.5) * subtitleScale * ASS_FONT_METRIC_FACTOR)
+    );
+    const assOutlineWidth = Math.max(1, Number((2.5 * subtitleScale).toFixed(2)));
 
     const assPath = path.join(tempDir, 'subtitles.ass');
     generateAssFile(subtitles, assPath, {
       width: targetWidth,
       height: targetHeight,
       fontSize: assFontSize,
+      outlineWidth: assOutlineWidth,
       style: subtitleStyle
     });
 
