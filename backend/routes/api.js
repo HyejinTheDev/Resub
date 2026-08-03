@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
+const Key = require('../models/Key');
 const PayOS = require('@payos/node');
 const { sendOtpEmail } = require('../services/emailService');
 
@@ -1036,50 +1037,50 @@ async function fetchKeyFromManager() {
     return process.env.GEMINI_API_KEY;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('Database is offline. Không thể kết nối tới cơ sở dữ liệu Key.');
+  }
 
   try {
-    const response = await fetch(`${KEY_MANAGER_URL}/api/get-key`, {
-      headers: { 'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Unknown KeyManager error' }));
-      throw new Error(err.error || 'Failed to fetch API key from KeyManager');
+    const keys = await Key.find({ status: 'active', provider: 'gemini' });
+    if (keys.length === 0) {
+      throw new Error('Tất cả API Key trong bể chứa đều đang bận hoặc hỏng.');
     }
-    const data = await response.json();
-    return data.apiKey;
+
+    // Sort by lastUsed ascending (Least Recently Used)
+    keys.sort((a, b) => new Date(a.lastUsed || 0) - new Date(b.lastUsed || 0));
+    const selected = keys[0];
+
+    // Update usage metrics
+    selected.lastUsed = new Date();
+    selected.useCount = (selected.useCount || 0) + 1;
+    selected.dailyUseCount = (selected.dailyUseCount || 0) + 1;
+    await selected.save();
+
+    return selected.key;
   } catch (err) {
-    clearTimeout(timeoutId);
-    let errorMsg = 'Không thể kết nối tới KeyManager. Vui lòng cấu hình biến GEMINI_API_KEY trong cài đặt Space hoặc tắt nút gạt "Dùng kho Key hệ thống" trên giao diện để nhập Key thủ công.';
-    if (err.name === 'AbortError') {
-      errorMsg = 'Kết nối tới KeyManager bị quá thời gian (Timeout). Vui lòng cấu hình biến GEMINI_API_KEY trong cài đặt Space hoặc tắt nút gạt "Dùng kho Key hệ thống" trên giao diện để nhập Key thủ công.';
-    }
-    throw new Error(errorMsg);
+    console.error('[api/fetchKey] Failed to fetch Key directly from DB:', err.message);
+    throw new Error(`Lỗi lấy API Key: ${err.message}`);
   }
 }
 
 async function reportBadKeyToManager(key, type) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
-
+  if (mongoose.connection.readyState !== 1) return;
   try {
-    await fetch(`${KEY_MANAGER_URL}/api/report-bad-key`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` 
-      },
-      body: JSON.stringify({ key, type }),
-      signal: controller.signal
-    });
+    const match = await Key.findOne({ key });
+    if (match) {
+      if (type === 'invalid') {
+        match.status = 'disabled';
+        console.log(`[api/reportBadKey] Key disabled (dead): ${key.substring(0, 8)}...`);
+      } else {
+        match.status = 'rate_limited';
+        console.log(`[api/reportBadKey] Key rate limited: ${key.substring(0, 8)}...`);
+      }
+      match.errorCount = (match.errorCount || 0) + 1;
+      await match.save();
+    }
   } catch (err) {
-    console.error('[api/reportBadKey] Failed:', err.message);
-  } finally {
-    clearTimeout(timeoutId);
+    console.error('[api/reportBadKey] Failed to update Key status in DB:', err.message);
   }
 }
 

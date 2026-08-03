@@ -7,48 +7,48 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { EdgeTTS } = require('node-edge-tts');
 
-const KEY_MANAGER_URL = process.env.KEY_MANAGER_URL || 'http://localhost:3060';
-const KEY_MANAGER_TOKEN = process.env.KEY_MANAGER_TOKEN || 'resub_secret_key_rotation_token_123';
+const mongoose = require('mongoose');
+const Cookie = require('../models/Cookie');
 
 async function fetchCookieFromManager() {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('Database is offline. Không thể kết nối tới cơ sở dữ liệu Cookie.');
+  }
 
   try {
-    const response = await fetch(`${KEY_MANAGER_URL}/api/get-cookie`, {
-      headers: { 'Authorization': `Bearer ${KEY_MANAGER_TOKEN}` },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch cookie from KeyManager');
+    const cookies = await Cookie.find({ status: 'active' });
+    if (cookies.length === 0) {
+      throw new Error('Không có CapCut Cookie nào hoạt động trong bể chứa.');
     }
-    const data = await response.json();
-    return data.cookie;
+
+    // Sort by lastUsed ascending (Least Recently Used)
+    cookies.sort((a, b) => new Date(a.lastUsed || 0) - new Date(b.lastUsed || 0));
+    const selected = cookies[0];
+
+    // Update usage
+    selected.lastUsed = new Date();
+    selected.useCount = (selected.useCount || 0) + 1;
+    await selected.save();
+
+    return selected.cookie;
   } catch (err) {
-    clearTimeout(timeoutId);
+    console.error('[dubbingEngine/fetchCookie] Failed to fetch cookie directly from DB:', err.message);
     throw err;
   }
 }
 
 async function reportBadCookieToManager(cookie) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
+  if (mongoose.connection.readyState !== 1) return;
   try {
-    await fetch(`${KEY_MANAGER_URL}/api/report-bad-cookie`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${KEY_MANAGER_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ cookie }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+    const match = await Cookie.findOne({ cookie });
+    if (match) {
+      match.status = 'disabled';
+      match.errorCount = (match.errorCount || 0) + 1;
+      await match.save();
+      console.log(`[dubbingEngine/reportBadCookie] Cookie disabled: ${cookie.substring(0, 20)}...`);
+    }
   } catch (err) {
-    clearTimeout(timeoutId);
+    console.error('[dubbingEngine/reportBadCookie] Failed to update cookie in DB:', err.message);
   }
 }
 
