@@ -7,8 +7,30 @@ const { generateTTS, getFfmpegCommand, getFfprobeCommand } = require('./dubbingE
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash'];
 
-async function analyzeComicPages(imagePaths, apiKey, style = '') {
-  const parts = [{ text: `Bạn là biên kịch video review truyện tranh Việt Nam. Hãy đọc các trang theo đúng thứ tự, hiểu diễn biến và viết lời kể hấp dẫn, tự nhiên cho từng trang. Không bịa chi tiết không có trong ảnh. Mỗi trang cần 1-3 câu, phù hợp giọng đọc video YouTube. Phong cách thêm: ${style || 'kịch tính, dễ nghe'}. Trả về duy nhất JSON array gồm các object {"page": số thứ tự bắt đầu từ 1, "script": "lời review tiếng Việt"}. Số phần tử phải đúng bằng số ảnh.` }];
+function splitImageBatches(imagePaths) {
+  const batches = [];
+  let batch = [];
+  let batchBytes = 0;
+  const maxBatchBytes = 8 * 1024 * 1024;
+  const maxBatchPages = 6;
+  for (const imagePath of imagePaths) {
+    const imageBytes = fs.statSync(imagePath).size;
+    if (batch.length > 0 && (batch.length >= maxBatchPages || batchBytes + imageBytes > maxBatchBytes)) {
+      batches.push(batch);
+      batch = [];
+      batchBytes = 0;
+    }
+    batch.push(imagePath);
+    batchBytes += imageBytes;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
+}
+
+async function analyzeComicBatch(imagePaths, apiKey, style, pageOffset, previousContext) {
+  const firstPage = pageOffset + 1;
+  const lastPage = pageOffset + imagePaths.length;
+  const parts = [{ text: `Bạn là biên kịch review truyện tranh Việt Nam. Đây là các trang ${firstPage}-${lastPage} trong một bộ truyện dài. Hãy đọc đúng thứ tự, hiểu diễn biến và viết lời kể hấp dẫn, tự nhiên cho từng trang. Không bịa chi tiết không có trong ảnh. Mỗi trang cần 1-3 câu. Phong cách: ${style || 'kịch tính, dễ nghe'}. Ngữ cảnh từ lô ngay trước (chỉ dùng để nối mạch, không lặp lại): ${previousContext || 'Đây là lô đầu tiên.'}. Trả về duy nhất JSON array gồm đúng ${imagePaths.length} object theo mẫu {"page": số trang, "script": "lời review tiếng Việt"}; page chạy từ ${firstPage} đến ${lastPage}.` }];
   for (const imagePath of imagePaths) {
     const ext = path.extname(imagePath).toLowerCase();
     const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
@@ -24,17 +46,30 @@ async function analyzeComicPages(imagePaths, apiKey, style = '') {
         { timeout: 180000, maxContentLength: 80 * 1024 * 1024, maxBodyLength: 80 * 1024 * 1024 }
       );
       const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-      const parsed = JSON.parse(raw.trim());
+      const decoded = JSON.parse(raw.trim());
+      const parsed = Array.isArray(decoded) ? decoded : decoded.scenes || decoded.pages || decoded.result;
       if (!Array.isArray(parsed) || parsed.length !== imagePaths.length) {
         throw new Error('AI trả về số cảnh không khớp số trang truyện.');
       }
-      return parsed.map((item, index) => ({ page: index + 1, script: String(item.script || '').trim() }));
+      return parsed.map((item, index) => ({ page: pageOffset + index + 1, script: String(item.script || item.text || '').trim() }));
     } catch (error) {
       lastError = error;
       console.warn(`[comicReview] ${model} analyze failed: ${error.response?.data?.error?.message || error.message}`);
     }
   }
   throw lastError || new Error('Không thể phân tích ảnh truyện.');
+}
+
+async function analyzeComicPages(imagePaths, apiKey, style = '') {
+  const batches = splitImageBatches(imagePaths);
+  const results = [];
+  for (const batch of batches) {
+    const previousContext = results.slice(-2).map((item) => item.script).join(' ');
+    console.log(`[comicReview] Analyzing pages ${results.length + 1}-${results.length + batch.length} of ${imagePaths.length}`);
+    const batchResults = await analyzeComicBatch(batch, apiKey, style, results.length, previousContext);
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 function runProcess(command, args, cancelToken) {

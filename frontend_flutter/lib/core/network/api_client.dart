@@ -449,18 +449,31 @@ class ApiClient {
     String style = '',
     void Function(int, int)? onSendProgress,
   }) async {
-    final uploads = <MultipartFile>[];
-    for (final file in files) {
-      uploads.add(
-        MultipartFile.fromBytes(await file.readAsBytes(), filename: file.name),
+    try {
+      final uploads = <MultipartFile>[];
+      for (final file in files) {
+        uploads.add(
+          MultipartFile.fromBytes(
+            await file.readAsBytes(),
+            filename: file.name,
+          ),
+        );
+      }
+      final response = await _dio.post(
+        '$_baseUrl/api/comic-review/analyze',
+        data: FormData.fromMap({'pages': uploads, 'style': style}),
+        onSendProgress: onSendProgress,
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (error) {
+      final data = error.response?.data;
+      if (data is Map && data['error'] != null) {
+        throw Exception(data['error'].toString());
+      }
+      throw Exception(
+        'AI không thể phân tích bộ ảnh. Vui lòng thử lại với ít ảnh hơn.',
       );
     }
-    final response = await _dio.post(
-      '$_baseUrl/api/comic-review/analyze',
-      data: FormData.fromMap({'pages': uploads, 'style': style}),
-      onSendProgress: onSendProgress,
-    );
-    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> startComicReviewRender(
