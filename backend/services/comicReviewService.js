@@ -5,7 +5,7 @@ const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const { generateTTS, getFfmpegCommand, getFfprobeCommand } = require('./dubbingEngine');
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 
 function splitImageBatches(imagePaths) {
   const batches = [];
@@ -37,7 +37,7 @@ async function analyzeComicBatch(imagePaths, apiKey, style, pageOffset, previous
     parts.push({ inlineData: { mimeType, data: fs.readFileSync(imagePath).toString('base64') } });
   }
 
-  let lastError;
+  const failures = [];
   for (const model of GEMINI_MODELS) {
     try {
       const response = await axios.post(
@@ -45,7 +45,13 @@ async function analyzeComicBatch(imagePaths, apiKey, style, pageOffset, previous
         { contents: [{ parts }], generationConfig: { responseMimeType: 'application/json' } },
         { timeout: 180000, maxContentLength: 80 * 1024 * 1024, maxBodyLength: 80 * 1024 * 1024 }
       );
-      const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) {
+        const reason = response.data?.promptFeedback?.blockReason
+          || response.data?.candidates?.[0]?.finishReason
+          || 'Gemini không trả về nội dung.';
+        throw new Error(`Gemini không thể xử lý lô ảnh này: ${reason}`);
+      }
       const decoded = JSON.parse(raw.trim());
       const parsed = Array.isArray(decoded) ? decoded : decoded.scenes || decoded.pages || decoded.result;
       if (!Array.isArray(parsed) || parsed.length !== imagePaths.length) {
@@ -53,11 +59,17 @@ async function analyzeComicBatch(imagePaths, apiKey, style, pageOffset, previous
       }
       return parsed.map((item, index) => ({ page: pageOffset + index + 1, script: String(item.script || item.text || '').trim() }));
     } catch (error) {
-      lastError = error;
-      console.warn(`[comicReview] ${model} analyze failed: ${error.response?.data?.error?.message || error.message}`);
+      const status = error.response?.status || error.response?.data?.error?.code || 0;
+      const message = error.response?.data?.error?.message || error.message;
+      failures.push({ model, status, message });
+      console.warn(`[comicReview] ${model} analyze failed: ${message}`);
     }
   }
-  throw lastError || new Error('Không thể phân tích ảnh truyện.');
+  const usefulFailure = failures.find((failure) => failure.status !== 404) || failures[0];
+  if (usefulFailure) {
+    throw new Error(`${usefulFailure.model}: ${usefulFailure.message}`);
+  }
+  throw new Error('Không thể phân tích ảnh truyện.');
 }
 
 async function analyzeComicPages(imagePaths, apiKey, style = '') {
