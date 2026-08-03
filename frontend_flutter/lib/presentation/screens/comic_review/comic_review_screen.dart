@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -24,6 +23,7 @@ class _ComicReviewScreenState extends State<ComicReviewScreen> {
     text: 'Kịch tính, cuốn hút, kể chuyện tự nhiên',
   );
   final List<XFile> _files = [];
+  Uint8List? _localPreviewBytes;
   List<Map<String, dynamic>> _scenes = [];
   bool _analyzing = false;
   bool _rendering = false;
@@ -69,30 +69,58 @@ class _ComicReviewScreenState extends State<ComicReviewScreen> {
   }
 
   Future<void> _pickPages() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'zip'],
-      allowMultiple: true,
-      withData: kIsWeb,
-    );
-    if (result == null) return;
-    setState(() {
-      _files
-        ..clear()
-        ..addAll(
-          result.files.map(
-            (file) => XFile(
-              file.path ?? '',
-              bytes: file.bytes,
-              name: file.name,
-              length: file.size,
-            ),
-          ),
-        );
-      _scenes = [];
-      _videoUrl = null;
-      _status = 'Đã chọn ${_files.length} tệp.';
-    });
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'zip'],
+        allowMultiple: true,
+        withData: kIsWeb,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final selected = <XFile>[];
+      Uint8List? previewBytes;
+      for (final file in result.files) {
+        late final XFile selectedFile;
+        if (kIsWeb) {
+          final bytes = file.bytes;
+          if (bytes == null || bytes.isEmpty) {
+            throw Exception(
+              'Trình duyệt không đọc được ${file.name}. Vui lòng chọn lại.',
+            );
+          }
+          selectedFile = XFile.fromData(
+            bytes,
+            name: file.name,
+            length: file.size,
+          );
+        } else {
+          if (file.path == null || file.path!.isEmpty) {
+            throw Exception('Không đọc được đường dẫn của ${file.name}.');
+          }
+          selectedFile = XFile(file.path!, name: file.name, length: file.size);
+        }
+        selected.add(selectedFile);
+        final extension = file.extension?.toLowerCase();
+        if (previewBytes == null && extension != 'zip') {
+          previewBytes = file.bytes ?? await selectedFile.readAsBytes();
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _files
+          ..clear()
+          ..addAll(selected);
+        _localPreviewBytes = previewBytes;
+        _scenes = [];
+        _videoUrl = null;
+        _progress = 0;
+        _status = 'Đã nhận ${_files.length} tệp. Nhấn nút AI để phân tích.';
+      });
+    } catch (error) {
+      if (mounted) _showError(error);
+    }
   }
 
   Future<void> _analyze() async {
@@ -443,7 +471,7 @@ class _ComicReviewScreenState extends State<ComicReviewScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               clipBehavior: Clip.antiAlias,
-              child: _scenes.isEmpty
+              child: _scenes.isEmpty && _localPreviewBytes == null
                   ? const Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -461,6 +489,8 @@ class _ComicReviewScreenState extends State<ComicReviewScreen> {
                         ],
                       ),
                     )
+                  : _scenes.isEmpty
+                  ? Image.memory(_localPreviewBytes!, fit: BoxFit.contain)
                   : Stack(
                       fit: StackFit.expand,
                       children: [
