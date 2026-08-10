@@ -128,7 +128,9 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Gói $subscriptionTier (${quota - used < 0 ? 0 : quota - used}/$quota lượt)',
+                      subscriptionTier == 'PRO'
+                          ? 'Gói PRO (Vô hạn)'
+                          : 'Gói $subscriptionTier (${quota - used < 0 ? 0 : quota - used}/$quota lượt)',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

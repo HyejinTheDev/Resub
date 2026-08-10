@@ -35,11 +35,11 @@ const UserSchema = new mongoose.Schema({
   subscriptionTier: {
     type: String,
     enum: ['free', 'pro'],
-    default: 'free'
+    default: 'pro'
   },
   videoExportQuota: {
     type: Number,
-    default: 10
+    default: 999999
   },
   videoExportUsed: {
     type: Number,

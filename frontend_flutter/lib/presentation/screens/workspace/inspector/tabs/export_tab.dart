@@ -421,7 +421,9 @@ class _ExportTabState extends State<ExportTab> {
                               ),
                             ),
                             Text(
-                              'Còn lại: ${remaining < 0 ? 0 : remaining} / ${user.videoExportQuota} lượt xuất',
+                              tier == 'PRO'
+                                  ? 'Còn lại: Vô hạn'
+                                  : 'Còn lại: ${remaining < 0 ? 0 : remaining} / ${user.videoExportQuota} lượt xuất',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,

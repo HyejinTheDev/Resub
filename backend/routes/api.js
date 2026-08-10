@@ -75,14 +75,29 @@ function writeUsers(users) {
 // Helper to reset user quota if 24 hours have passed
 async function checkAndUpdateUserQuota(user) {
   if (!user) return user;
+  
+  let modified = false;
+  if (user.subscriptionTier !== 'pro') {
+    user.subscriptionTier = 'pro';
+    modified = true;
+  }
+  if (user.videoExportQuota !== 999999) {
+    user.videoExportQuota = 999999;
+    modified = true;
+  }
+
   const now = new Date();
   const lastReset = user.lastQuotaReset || user.createdAt || now;
   const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60);
   if (hoursSinceReset >= 24) {
     user.videoExportUsed = 0;
     user.lastQuotaReset = now;
-    await user.save();
+    modified = true;
     console.log(`[quota] Reset quota for user ${user.username} after ${hoursSinceReset.toFixed(1)} hours.`);
+  }
+  
+  if (modified) {
+    await user.save();
   }
   return user;
 }
