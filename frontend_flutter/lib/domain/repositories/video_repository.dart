@@ -3,7 +3,10 @@ import 'package:cross_file/cross_file.dart';
 abstract class VideoRepository {
   /// Upload a video file to the server.
   /// Returns the server paths/metadata for videoPath, audioPath, videoUrl.
-  Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int sent, int total)? onSendProgress});
+  Future<Map<String, dynamic>> uploadVideo(
+    XFile file, {
+    void Function(int sent, int total)? onSendProgress,
+  });
 
   /// Trigger the transcription AI request.
   /// Returns the taskId for polling.
@@ -30,20 +33,44 @@ abstract class VideoRepository {
   Future<void> cancelDubbing(String exportId);
 
   /// Split a long video file into segments.
-  Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int sent, int total)? onSendProgress});
+  Future<Map<String, dynamic>> splitVideo(
+    XFile file,
+    double segmentMinutes, {
+    void Function(int sent, int total)? onSendProgress,
+  });
 
   /// Load a previously split video segment as a new project.
   Future<Map<String, dynamic>> loadSplitSegment(String filePath);
 
   /// Generate TTS preview audio URL.
-  Future<String> ttsPreview({required String text, required String voice, required String capcutCookie});
+  Future<String> ttsPreview({
+    required String text,
+    required String voice,
+    required String capcutCookie,
+  });
 
   /// Suggest a storyboard context from subtitles.
-  Future<Map<String, dynamic>> suggestStoryboard({required List<dynamic> subtitles, String? geminiKey});
+  Future<Map<String, dynamic>> suggestStoryboard({
+    required List<dynamic> subtitles,
+    String? geminiKey,
+  });
 
   /// Re-translate subtitles incorporating storyboard context.
-  Future<Map<String, dynamic>> translateWithStoryboard({required List<dynamic> subtitles, required Map<String, dynamic> storyboard, String? geminiKey});
+  Future<Map<String, dynamic>> translateWithStoryboard({
+    required List<dynamic> subtitles,
+    required Map<String, dynamic> storyboard,
+    String? geminiKey,
+  });
 
   /// Download a video from a URL (YouTube, Drive, etc.) on the server.
   Future<Map<String, dynamic>> downloadVideo(String url);
+
+  Future<List<Map<String, dynamic>>> analyzeComicPages(
+    List<XFile> files, {
+    String style,
+    void Function(int sent, int total)? onSendProgress,
+  });
+  Future<String> startComicReviewRender(List<Map<String, dynamic>> scenes);
+  Future<Map<String, dynamic>> getComicReviewStatus(String exportId);
+  Future<void> cancelComicReview(String exportId);
 }

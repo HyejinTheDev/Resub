@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const AdmZip = require('adm-zip');
 const { spawn, execSync } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
@@ -40,6 +41,7 @@ const { exportQueue, transcribeQueue } = require('../services/taskQueue');
 const { getPublicBaseUrl, getFullUrl } = require('../utils/urlHelpers');
 const { detectSubtitlePosition } = require('../services/geminiService');
 const { suggestStoryboard, translateWithStoryboard } = require('../services/storyboardService');
+const { analyzeComicPages, renderComicReview } = require('../services/comicReviewService');
 
 const router = express.Router();
 
@@ -49,7 +51,9 @@ const VIDEOS_DIR = path.join(DOWNLOADS_DIR, 'videos');
 const AUDIOS_DIR = path.join(DOWNLOADS_DIR, 'audios');
 const EXPORTS_DIR = path.join(DOWNLOADS_DIR, 'exports');
 const TEMP_TTS_DIR = path.join(DOWNLOADS_DIR, 'temp_tts');
+const COMIC_DIR = path.join(DOWNLOADS_DIR, 'comic');
 const USERS_FILE = path.join(DOWNLOADS_DIR, 'users.json');
+fs.mkdirSync(COMIC_DIR, { recursive: true });
 
 // Helper to read users
 function readUsers() {
@@ -1100,6 +1104,15 @@ const upload = multer({
   limits: { fileSize: maxUploadMb * 1024 * 1024 }
 });
 
+const comicStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, COMIC_DIR),
+  filename: (_req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`)
+});
+const comicUpload = multer({
+  storage: comicStorage,
+  limits: { fileSize: 100 * 1024 * 1024, files: 60 }
+});
+
 function getFfmpegCommand() {
   const parentFfmpeg = path.join(
     __dirname,
@@ -1809,6 +1822,109 @@ router.post('/translate-with-storyboard', async (req, res) => {
     console.error('[api/translate-with-storyboard] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
+});
+
+global.comicReviewProgress = global.comicReviewProgress || {};
+global.comicReviewTasks = global.comicReviewTasks || {};
+
+router.post('/comic-review/analyze', comicUpload.array('pages', 60), async (req, res) => {
+  const uploaded = req.files || [];
+  if (uploaded.length === 0) return res.status(400).json({ error: 'Vui lòng chọn ảnh hoặc file ZIP truyện.' });
+  try {
+    const imagePaths = [];
+    const allowed = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+    let totalImageBytes = 0;
+    const maxComicBytes = 80 * 1024 * 1024;
+    for (const file of uploaded) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext === '.zip') {
+        const zip = new AdmZip(file.path);
+        const entries = zip.getEntries().filter((entry) => !entry.isDirectory && allowed.has(path.extname(entry.entryName).toLowerCase())).slice(0, 60 - imagePaths.length);
+        for (const entry of entries) {
+          const entryBytes = Number(entry.header?.size || 0);
+          if (entryBytes <= 0 || totalImageBytes + entryBytes > maxComicBytes) throw new Error('Bộ ảnh sau giải nén vượt giới hạn 80 MB.');
+          const output = path.join(COMIC_DIR, `${uuidv4()}${path.extname(entry.entryName).toLowerCase()}`);
+          fs.writeFileSync(output, entry.getData());
+          imagePaths.push(output);
+          totalImageBytes += entryBytes;
+        }
+        fs.unlinkSync(file.path);
+      } else if (allowed.has(ext)) {
+        totalImageBytes += file.size;
+        if (totalImageBytes > maxComicBytes) throw new Error('Tổng dung lượng ảnh vượt giới hạn 80 MB.');
+        imagePaths.push(file.path);
+      } else {
+        fs.unlinkSync(file.path);
+      }
+    }
+    if (imagePaths.length === 0) return res.status(400).json({ error: 'Không tìm thấy ảnh JPG, PNG hoặc WebP hợp lệ.' });
+    const apiKey = req.body.geminiKey || await fetchKeyFromManager();
+    const scripts = await analyzeComicPages(imagePaths, apiKey, req.body.style || '');
+    const publicBase = getPublicBaseUrl(req);
+    res.json({
+      success: true,
+      scenes: imagePaths.map((imagePath, index) => ({
+        fileId: path.basename(imagePath),
+        imageUrl: getFullUrl(publicBase, `/downloads/comic/${path.basename(imagePath)}`),
+        script: scripts[index]?.script || ''
+      }))
+    });
+  } catch (error) {
+    console.error('[comic-review/analyze]', error.message);
+    res.status(500).json({ error: error.response?.data?.error?.message || error.message });
+  }
+});
+
+router.post('/comic-review/render', async (req, res) => {
+  const { scenes, voice = 'capcut-cogaihoatngon', capcutCookie = '' } = req.body;
+  if (!Array.isArray(scenes) || scenes.length === 0) return res.status(400).json({ error: 'Danh sách cảnh trống.' });
+  const safeScenes = [];
+  for (const scene of scenes.slice(0, 60)) {
+    const fileId = path.basename(String(scene.fileId || ''));
+    const imagePath = path.join(COMIC_DIR, fileId);
+    const script = String(scene.script || '').trim();
+    if (!fileId || !fs.existsSync(imagePath) || !script) return res.status(400).json({ error: 'Cảnh review không hợp lệ hoặc thiếu lời dẫn.' });
+    safeScenes.push({ imagePath, script });
+  }
+  const exportId = uuidv4();
+  const outputPath = path.join(EXPORTS_DIR, `comic-review-${exportId}.mp4`);
+  const cancelToken = { cancelled: false, proc: null };
+  global.comicReviewTasks[exportId] = cancelToken;
+  global.comicReviewProgress[exportId] = { status: 'queued', percent: 1, message: 'Đang chờ dựng video review...' };
+  res.json({ success: true, exportId });
+  exportQueue.enqueue(exportId, async () => {
+    try {
+      global.comicReviewProgress[exportId] = { status: 'processing', percent: 2, message: 'Đang chuẩn bị cảnh...' };
+      await renderComicReview({
+        scenes: safeScenes, voice, outputPath, capcutCookie, cancelToken,
+        onProgress: (percent, message) => { global.comicReviewProgress[exportId] = { status: 'processing', percent, message }; }
+      });
+      const publicBase = getPublicBaseUrl(req);
+      global.comicReviewProgress[exportId] = { status: 'completed', percent: 100, message: 'Xuất video thành công.', videoUrl: getFullUrl(publicBase, `/downloads/exports/${path.basename(outputPath)}`) };
+    } catch (error) {
+      global.comicReviewProgress[exportId] = error.message === 'EXPORT_CANCELLED'
+        ? { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' }
+        : { status: 'error', percent: 100, error: error.message };
+    } finally { delete global.comicReviewTasks[exportId]; }
+  }, () => { global.comicReviewProgress[exportId] = { status: 'queued', percent: 1, message: 'Đang chờ lượt máy chủ...' }; });
+});
+
+router.get('/comic-review/status', (req, res) => {
+  const progress = global.comicReviewProgress[String(req.query.exportId || '')];
+  if (!progress) return res.status(404).json({ error: 'Không tìm thấy tác vụ.' });
+  res.json(progress);
+});
+
+router.post('/comic-review/cancel', (req, res) => {
+  const exportId = String(req.body.exportId || '');
+  const task = global.comicReviewTasks[exportId];
+  exportQueue.cancel(exportId);
+  if (task) {
+    task.cancelled = true;
+    try { task.proc?.kill('SIGKILL'); } catch (_) {}
+  }
+  global.comicReviewProgress[exportId] = { status: 'cancelled', percent: 100, message: 'Đã hủy xuất video.' };
+  res.json({ success: true });
 });
 
 module.exports = router;

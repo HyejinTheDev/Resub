@@ -8,7 +8,10 @@ class VideoRepositoryImpl implements VideoRepository {
   VideoRepositoryImpl({required this.apiClient});
 
   @override
-  Future<Map<String, dynamic>> uploadVideo(XFile file, {void Function(int sent, int total)? onSendProgress}) async {
+  Future<Map<String, dynamic>> uploadVideo(
+    XFile file, {
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
     return await apiClient.uploadVideo(file, onSendProgress: onSendProgress);
   }
 
@@ -25,7 +28,7 @@ class VideoRepositoryImpl implements VideoRepository {
       geminiKey: geminiKey,
       useSystemPool: useSystemPool,
     );
-    
+
     if (result['success'] == true && result['taskId'] != null) {
       return result['taskId'].toString();
     }
@@ -57,8 +60,16 @@ class VideoRepositoryImpl implements VideoRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> splitVideo(XFile file, double segmentMinutes, {void Function(int sent, int total)? onSendProgress}) async {
-    return await apiClient.splitVideo(file, segmentMinutes, onSendProgress: onSendProgress);
+  Future<Map<String, dynamic>> splitVideo(
+    XFile file,
+    double segmentMinutes, {
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
+    return await apiClient.splitVideo(
+      file,
+      segmentMinutes,
+      onSendProgress: onSendProgress,
+    );
   }
 
   @override
@@ -67,8 +78,16 @@ class VideoRepositoryImpl implements VideoRepository {
   }
 
   @override
-  Future<String> ttsPreview({required String text, required String voice, required String capcutCookie}) async {
-    final result = await apiClient.ttsPreview(text: text, voice: voice, capcutCookie: capcutCookie);
+  Future<String> ttsPreview({
+    required String text,
+    required String voice,
+    required String capcutCookie,
+  }) async {
+    final result = await apiClient.ttsPreview(
+      text: text,
+      voice: voice,
+      capcutCookie: capcutCookie,
+    );
     if (result['audioUrl'] != null) {
       return result['audioUrl'].toString();
     }
@@ -111,4 +130,42 @@ class VideoRepositoryImpl implements VideoRepository {
   Future<Map<String, dynamic>> downloadVideo(String url) async {
     return await apiClient.downloadVideo(url);
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> analyzeComicPages(
+    List<XFile> files, {
+    String style = '',
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
+    final result = await apiClient.analyzeComicPages(
+      files,
+      style: style,
+      onSendProgress: onSendProgress,
+    );
+    if (result['success'] != true || result['scenes'] is! List) {
+      throw Exception(result['error'] ?? 'Không thể phân tích truyện.');
+    }
+    return (result['scenes'] as List)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  @override
+  Future<String> startComicReviewRender(
+    List<Map<String, dynamic>> scenes,
+  ) async {
+    final result = await apiClient.startComicReviewRender(scenes);
+    if (result['success'] != true || result['exportId'] == null) {
+      throw Exception(result['error'] ?? 'Không thể bắt đầu xuất video.');
+    }
+    return result['exportId'].toString();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getComicReviewStatus(String exportId) =>
+      apiClient.getComicReviewStatus(exportId);
+
+  @override
+  Future<void> cancelComicReview(String exportId) =>
+      apiClient.cancelComicReview(exportId);
 }

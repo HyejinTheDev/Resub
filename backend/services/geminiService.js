@@ -23,7 +23,7 @@ const envModels = process.env.GEMINI_TRANSCRIBE_MODELS
 
 const TRANSCRIBE_MODELS = envModels || [
   'gemini-2.5-flash',
-  'gemini-1.5-flash'
+  'gemini-2.5-flash-lite'
 ];
 
 /**

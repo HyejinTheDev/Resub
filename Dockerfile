@@ -2,7 +2,7 @@
 FROM node:20-bookworm-slim
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg \
+  && apt-get install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,6 +19,7 @@ RUN mkdir -p /app/backend/downloads/videos \
              /app/backend/downloads/audios \
              /app/backend/downloads/exports \
              /app/backend/downloads/temp_tts \
+             /app/backend/downloads/comic \
   && chown -R 1000:1000 /app
 
 ENV NODE_ENV=production

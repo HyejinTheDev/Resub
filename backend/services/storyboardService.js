@@ -1,8 +1,8 @@
 const axios = require('axios');
 
 const TRANSCRIBE_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.5-flash'
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite'
 ];
 
 /**
