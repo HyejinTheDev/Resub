@@ -31,27 +31,32 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
   void _initializeController() {
     final state = context.read<WorkspaceBloc>().state;
     final String? videoUrl = state.videoData['videoUrl'];
-    
+
     if (videoUrl != null && videoUrl.isNotEmpty) {
       _controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
       // Force mute on startup to satisfy browser sandbox/iframe autoplay block
       _controller!.setVolume(0.0);
-      _controller!.initialize().then((_) {
-        // Restore background volume once successfully initialized
-        _controller!.setVolume(state.bgVolume);
-        _controller!.setPlaybackSpeed(1.0); // Play 1.0x speed by default (video is pre-slowed)
-        setState(() {});
-        _controller!.addListener(_onPlayerUpdate);
-      }).catchError((error) {
-        debugPrint('VideoPlayer initialization error: $error');
-        setState(() {});
-      });
+      _controller!
+          .initialize()
+          .then((_) {
+            // Restore background volume once successfully initialized
+            _controller!.setVolume(state.bgVolume);
+            _controller!.setPlaybackSpeed(
+              1.0,
+            ); // Play 1.0x speed by default (video is pre-slowed)
+            setState(() {});
+            _controller!.addListener(_onPlayerUpdate);
+          })
+          .catchError((error) {
+            debugPrint('VideoPlayer initialization error: $error');
+            setState(() {});
+          });
     }
   }
 
   void _onPlayerUpdate() {
     if (_controller == null) return;
-    
+
     final currentMs = _controller!.value.position.inMilliseconds;
     final isPlaying = _controller!.value.isPlaying;
     final durationMs = _controller!.value.duration.inMilliseconds.toDouble();
@@ -74,7 +79,9 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
 
   // Parse custom ASS-like time string ("00m01s200ms") into milliseconds
   int _parseTimeToMs(String timeStr) {
-    final match = RegExp(r'(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?').firstMatch(timeStr);
+    final match = RegExp(
+      r'(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?',
+    ).firstMatch(timeStr);
     if (match == null) return 0;
     final m = int.tryParse(match.group(1) ?? '0') ?? 0;
     final s = int.tryParse(match.group(2) ?? '0') ?? 0;
@@ -99,7 +106,11 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
             SizedBox(height: 16),
             Text(
               'Trình phát — Dòng thời gian 01',
-              style: TextStyle(fontSize: 15, color: Colors.white54, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white54,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             SizedBox(height: 6),
             Text(
@@ -126,7 +137,8 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
           },
           listener: (context, state) {
             final String videoUrl = state.videoData['videoUrl'] ?? '';
-            final bool addedToTimeline = state.videoData['addedToTimeline'] == true;
+            final bool addedToTimeline =
+                state.videoData['addedToTimeline'] == true;
             if (videoUrl.isNotEmpty && addedToTimeline) {
               if (_controller != null) {
                 _controller!.removeListener(_onPlayerUpdate);
@@ -153,7 +165,8 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
       child: BlocBuilder<WorkspaceBloc, WorkspaceState>(
         builder: (context, state) {
           final String videoUrl = state.videoData['videoUrl'] ?? '';
-          final bool addedToTimeline = state.videoData['addedToTimeline'] == true;
+          final bool addedToTimeline =
+              state.videoData['addedToTimeline'] == true;
 
           if (videoUrl.isEmpty || !addedToTimeline) {
             return _buildEmptyPlayerPlaceholder();
@@ -173,14 +186,22 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                     Text(
                       'Đang tải video...\n$videoUrl',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                    if (errorMsg != null || (_controller != null && _controller!.value.hasError)) ...[
+                    if (errorMsg != null ||
+                        (_controller != null &&
+                            _controller!.value.hasError)) ...[
                       const SizedBox(height: 12),
                       Text(
                         'Lỗi: ${errorMsg ?? _controller?.value.errorDescription ?? "Không thể khởi tạo trình phát video."}',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12, color: AppColors.error),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.error,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
@@ -213,300 +234,389 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
               final end = _parseTimeToMs(sub.endTime);
               return state.currentTimeMs >= start && state.currentTimeMs <= end;
             },
-            orElse: () => const Subtitle(startTime: '', endTime: '', chineseText: '', text: ''),
+            orElse: () => const Subtitle(
+              startTime: '',
+              endTime: '',
+              chineseText: '',
+              text: '',
+            ),
           );
 
           final hasActiveSubtitle = activeSub.text.isNotEmpty;
-          final currentY = _isDraggingSubtitle ? _dragYPercent : state.subtitleYPercent;
-          final showSnappingGuide = _isDraggingSubtitle && (currentY - 50.0).abs() < 2.0;
+          final currentY = _isDraggingSubtitle
+              ? _dragYPercent
+              : state.subtitleYPercent;
+          final showSnappingGuide =
+              _isDraggingSubtitle && (currentY - 50.0).abs() < 2.0;
 
-        return Column(
-          children: [
-            Expanded(
-              child: Container(
-                color: Colors.black,
-                alignment: Alignment.center,
-                child: AspectRatio(
-                  aspectRatio: _controller!.value.aspectRatio,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Stack(
-                        children: [
-                          // 1. Video Player
-                          Positioned.fill(
-                            child: VideoPlayer(_controller!),
-                          ),
-
-                  // 2. Snapping Guideline (Horizontal line at 50% Y coordinate)
-                  if (showSnappingGuide)
-                    Positioned(
-                      top: constraints.maxHeight * 0.5,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        height: 1,
-                        color: Colors.pink,
-                      ),
-                    ),
-
-                  // 3. Blur masks simulation (cheats with semi-transparent card)
-                  ...state.blurMasks.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final mask = entry.value;
-                    final start = _parseTimeToMs(mask.startTime);
-                    final end = _parseTimeToMs(mask.endTime);
-                    final isVisible = state.currentTimeMs >= start && state.currentTimeMs <= end;
-
-                    if (!isVisible || !mask.enabled) return const SizedBox.shrink();
-
-                    final bool isSelected = state.selectedMaskIndex == idx;
-
-                    // Calculate positioning coordinates
-                    final double left = constraints.maxWidth * (mask.xPercentage - mask.widthPercentage / 2) / 100;
-                    final double top = constraints.maxHeight * (mask.yPercentage - mask.heightPercentage / 2) / 100;
-                    final double width = constraints.maxWidth * mask.widthPercentage / 100;
-                    final double height = constraints.maxHeight * mask.heightPercentage / 100;
-
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      updateBlurMaskStyles(
-                        idx,
-                        mask.blurRadius,
-                        mask.color,
-                        mask.opacity,
-                      );
-                    });
-
-                    final Widget maskWidget = Stack(
-                      children: [
-                        HtmlElementView(viewType: 'blur-mask-view-$idx'),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.4),
-                              width: isSelected ? 2.5 : 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ],
-                    );
-
-                    if (!isSelected) {
-                      return Positioned(
-                        left: left,
-                        top: top,
-                        width: width,
-                        height: height,
-                        child: GestureDetector(
-                          onTap: () {
-                            context.read<WorkspaceBloc>().add(SelectBlurMaskEvent(idx));
-                          },
-                          child: maskWidget,
-                        ),
-                      );
-                    }
-
-                    // Selected Mask: Allows dragging to move and resize handle
-                    return Positioned(
-                      left: left,
-                      top: top,
-                      width: width,
-                      height: height,
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: Stack(
-                          clipBehavior: Clip.none,
+          return Column(
+            children: [
+              Expanded(
+                child: Container(
+                  color: Colors.black,
+                  alignment: Alignment.center,
+                  child: AspectRatio(
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Stack(
                           children: [
-                            // Move drag detector
-                            Positioned.fill(
-                              child: GestureDetector(
-                                onPanUpdate: (details) {
-                                  final deltaXPercent = (details.delta.dx / constraints.maxWidth) * 100;
-                                  final deltaYPercent = (details.delta.dy / constraints.maxHeight) * 100;
-                                  final newX = (mask.xPercentage + deltaXPercent).clamp(0.0, 100.0);
-                                  final newY = (mask.yPercentage + deltaYPercent).clamp(0.0, 100.0);
-                                  context.read<WorkspaceBloc>().add(
-                                        UpdateBlurMaskEvent(
-                                          index: idx,
-                                          mask: mask.copyWith(xPercentage: newX, yPercentage: newY),
-                                        ),
-                                      );
-                                },
-                                child: maskWidget,
+                            // 1. Video Player
+                            Positioned.fill(child: VideoPlayer(_controller!)),
+
+                            // 2. Snapping Guideline (Horizontal line at 50% Y coordinate)
+                            if (showSnappingGuide)
+                              Positioned(
+                                top: constraints.maxHeight * 0.5,
+                                left: 0,
+                                right: 0,
+                                child: Container(height: 1, color: Colors.pink),
                               ),
-                            ),
-                            // Resize corner handle (bottom-right)
-                            Positioned(
-                              right: -8,
-                              bottom: -8,
-                              child: GestureDetector(
-                                onPanUpdate: (details) {
-                                  final deltaWidthPercent = (details.delta.dx / constraints.maxWidth) * 100 * 2;
-                                  final deltaHeightPercent = (details.delta.dy / constraints.maxHeight) * 100 * 2;
-                                  final newW = (mask.widthPercentage + deltaWidthPercent).clamp(5.0, 100.0);
-                                  final newH = (mask.heightPercentage + deltaHeightPercent).clamp(2.0, 100.0);
-                                  context.read<WorkspaceBloc>().add(
-                                        UpdateBlurMaskEvent(
-                                          index: idx,
-                                          mask: mask.copyWith(widthPercentage: newW, heightPercentage: newH),
-                                        ),
-                                      );
-                                },
-                                child: Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
+
+                            // 3. Blur masks simulation (cheats with semi-transparent card)
+                            ...state.blurMasks.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final mask = entry.value;
+                              final start = _parseTimeToMs(mask.startTime);
+                              final end = _parseTimeToMs(mask.endTime);
+                              final isVisible =
+                                  state.currentTimeMs >= start &&
+                                  state.currentTimeMs <= end;
+
+                              if (!isVisible || !mask.enabled)
+                                return const SizedBox.shrink();
+
+                              final bool isSelected =
+                                  state.selectedMaskIndex == idx;
+
+                              // Calculate positioning coordinates
+                              final double left =
+                                  constraints.maxWidth *
+                                  (mask.xPercentage -
+                                      mask.widthPercentage / 2) /
+                                  100;
+                              final double top =
+                                  constraints.maxHeight *
+                                  (mask.yPercentage -
+                                      mask.heightPercentage / 2) /
+                                  100;
+                              final double width =
+                                  constraints.maxWidth *
+                                  mask.widthPercentage /
+                                  100;
+                              final double height =
+                                  constraints.maxHeight *
+                                  mask.heightPercentage /
+                                  100;
+
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                updateBlurMaskStyles(
+                                  idx,
+                                  mask.blurRadius,
+                                  mask.color,
+                                  mask.opacity,
+                                );
+                              });
+
+                              final Widget maskWidget = Stack(
+                                children: [
+                                  HtmlElementView(
+                                    viewType: 'blur-mask-view-$idx',
                                   ),
-                                  child: const Icon(Icons.zoom_out_map, size: 10, color: Colors.black),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.primary.withValues(
+                                                alpha: 0.4,
+                                              ),
+                                        width: isSelected ? 2.5 : 1.5,
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ],
+                              );
 
-                  // 4. Subtitle Overlay (Draggable widget)
-                  if (hasActiveSubtitle)
-                    Positioned(
-                      top: constraints.maxHeight * (currentY / 100),
-                      left: constraints.maxWidth * 0.1,
-                      right: constraints.maxWidth * 0.1,
-                      child: FractionalTranslation(
-                        translation: const Offset(0.0, -0.5),
-                        child: GestureDetector(
-                          onVerticalDragStart: (_) {
-                            setState(() {
-                              _isDraggingSubtitle = true;
-                              _dragYPercent = state.subtitleYPercent;
-                            });
-                          },
-                          onVerticalDragUpdate: (details) {
-                            setState(() {
-                              // Convert delta dy to percentage
-                              final deltaYPercent = (details.primaryDelta! / constraints.maxHeight) * 100;
-                              var newY = _dragYPercent + deltaYPercent;
-                              newY = newY.clamp(10.0, 95.0);
-                              
-                              // Snapping logic: if within 2% of 50%, snap to exactly 50%
-                              if ((newY - 50.0).abs() < 2.0) {
-                                newY = 50.0;
+                              if (!isSelected) {
+                                return Positioned(
+                                  left: left,
+                                  top: top,
+                                  width: width,
+                                  height: height,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      context.read<WorkspaceBloc>().add(
+                                        SelectBlurMaskEvent(idx),
+                                      );
+                                    },
+                                    child: maskWidget,
+                                  ),
+                                );
                               }
-                              
-                              _dragYPercent = newY;
-                            });
-                          },
-                          onVerticalDragEnd: (_) {
-                            setState(() {
-                              _isDraggingSubtitle = false;
-                            });
-                            context.read<WorkspaceBloc>().add(
-                              UpdateSubtitleStyleEvent(yPercent: _dragYPercent),
-                            );
-                          },
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Thick border stroke behind the text
-                              Text(
-                                activeSub.text,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: state.subtitleFontSize * 1.5,
-                                  fontWeight: FontWeight.bold,
-                                  foreground: Paint()
-                                    ..style = PaintingStyle.stroke
-                                    ..strokeWidth = 5.0
-                                    ..color = _colorFromHex(state.subtitleOutlineColor),
-                                ),
-                              ),
-                              // Solid foreground text
-                              Text(
-                                activeSub.text,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _colorFromHex(state.subtitleColor),
-                                  fontSize: state.subtitleFontSize * 1.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
 
-                        ],
-                      );
-                    },
+                              // Selected Mask: Allows dragging to move and resize handle
+                              return Positioned(
+                                left: left,
+                                top: top,
+                                width: width,
+                                height: height,
+                                child: SizedBox(
+                                  width: width,
+                                  height: height,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      // Move drag detector
+                                      Positioned.fill(
+                                        child: GestureDetector(
+                                          onPanUpdate: (details) {
+                                            final deltaXPercent =
+                                                (details.delta.dx /
+                                                    constraints.maxWidth) *
+                                                100;
+                                            final deltaYPercent =
+                                                (details.delta.dy /
+                                                    constraints.maxHeight) *
+                                                100;
+                                            final newX =
+                                                (mask.xPercentage +
+                                                        deltaXPercent)
+                                                    .clamp(0.0, 100.0);
+                                            final newY =
+                                                (mask.yPercentage +
+                                                        deltaYPercent)
+                                                    .clamp(0.0, 100.0);
+                                            context.read<WorkspaceBloc>().add(
+                                              UpdateBlurMaskEvent(
+                                                index: idx,
+                                                mask: mask.copyWith(
+                                                  xPercentage: newX,
+                                                  yPercentage: newY,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: maskWidget,
+                                        ),
+                                      ),
+                                      // Resize corner handle (bottom-right)
+                                      Positioned(
+                                        right: -8,
+                                        bottom: -8,
+                                        child: GestureDetector(
+                                          onPanUpdate: (details) {
+                                            final deltaWidthPercent =
+                                                (details.delta.dx /
+                                                    constraints.maxWidth) *
+                                                100 *
+                                                2;
+                                            final deltaHeightPercent =
+                                                (details.delta.dy /
+                                                    constraints.maxHeight) *
+                                                100 *
+                                                2;
+                                            final newW =
+                                                (mask.widthPercentage +
+                                                        deltaWidthPercent)
+                                                    .clamp(5.0, 100.0);
+                                            final newH =
+                                                (mask.heightPercentage +
+                                                        deltaHeightPercent)
+                                                    .clamp(2.0, 100.0);
+                                            context.read<WorkspaceBloc>().add(
+                                              UpdateBlurMaskEvent(
+                                                index: idx,
+                                                mask: mask.copyWith(
+                                                  widthPercentage: newW,
+                                                  heightPercentage: newH,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            width: 18,
+                                            height: 18,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.zoom_out_map,
+                                              size: 10,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+
+                            // 4. Subtitle Overlay (Draggable widget)
+                            if (hasActiveSubtitle)
+                              Positioned(
+                                top: constraints.maxHeight * (currentY / 100),
+                                left: constraints.maxWidth * 0.1,
+                                right: constraints.maxWidth * 0.1,
+                                child: FractionalTranslation(
+                                  translation: const Offset(0.0, -0.5),
+                                  child: GestureDetector(
+                                    onVerticalDragStart: (_) {
+                                      setState(() {
+                                        _isDraggingSubtitle = true;
+                                        _dragYPercent = state.subtitleYPercent;
+                                      });
+                                    },
+                                    onVerticalDragUpdate: (details) {
+                                      setState(() {
+                                        // Convert delta dy to percentage
+                                        final deltaYPercent =
+                                            (details.primaryDelta! /
+                                                constraints.maxHeight) *
+                                            100;
+                                        var newY =
+                                            _dragYPercent + deltaYPercent;
+                                        newY = newY.clamp(10.0, 95.0);
+
+                                        // Snapping logic: if within 2% of 50%, snap to exactly 50%
+                                        if ((newY - 50.0).abs() < 2.0) {
+                                          newY = 50.0;
+                                        }
+
+                                        _dragYPercent = newY;
+                                      });
+                                    },
+                                    onVerticalDragEnd: (_) {
+                                      setState(() {
+                                        _isDraggingSubtitle = false;
+                                      });
+                                      context.read<WorkspaceBloc>().add(
+                                        UpdateSubtitleStyleEvent(
+                                          yPercent: _dragYPercent,
+                                        ),
+                                      );
+                                    },
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        // Thick border stroke behind the text
+                                        Text(
+                                          activeSub.text,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize:
+                                                state.subtitleFontSize * 1.5,
+                                            fontWeight: FontWeight.bold,
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = 5.0
+                                              ..color = _colorFromHex(
+                                                state.subtitleOutlineColor,
+                                              ),
+                                          ),
+                                        ),
+                                        // Solid foreground text
+                                        Text(
+                                          activeSub.text,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: _colorFromHex(
+                                              state.subtitleColor,
+                                            ),
+                                            fontSize:
+                                                state.subtitleFontSize * 1.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
-            ),
-            // 5. Playback Controller Buttons (placed below the video area)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.black, // Solid black
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (_controller!.value.isPlaying) {
-                          _controller!.pause();
-                        } else {
-                          _controller!.play();
-                        }
-                      });
-                    },
-                  ),
-                  Text(
-                    _formatDuration(_controller!.value.position),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: AppColors.primary,
-                        inactiveTrackColor: AppColors.border,
-                        thumbColor: AppColors.primary,
-                        trackHeight: 3,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              // 5. Playback Controller Buttons (placed below the video area)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: Colors.black, // Solid black
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _controller!.value.isPlaying
+                            ? Icons.pause
+                            : Icons.play_arrow,
+                        color: Colors.white,
                       ),
-                      child: Slider(
-                        min: 0.0,
-                        max: _controller!.value.duration.inMilliseconds.toDouble(),
-                        value: _controller!.value.position.inMilliseconds.toDouble().clamp(
-                          0.0,
-                          _controller!.value.duration.inMilliseconds.toDouble(),
+                      onPressed: () {
+                        setState(() {
+                          if (_controller!.value.isPlaying) {
+                            _controller!.pause();
+                          } else {
+                            _controller!.play();
+                          }
+                        });
+                      },
+                    ),
+                    Text(
+                      _formatDuration(_controller!.value.position),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: AppColors.border,
+                          thumbColor: AppColors.primary,
+                          trackHeight: 3,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
                         ),
-                        onChanged: (value) {
-                          _controller!.seekTo(Duration(milliseconds: value.toInt()));
-                        },
+                        child: Slider(
+                          min: 0.0,
+                          max: _controller!.value.duration.inMilliseconds
+                              .toDouble(),
+                          value: _controller!.value.position.inMilliseconds
+                              .toDouble()
+                              .clamp(
+                                0.0,
+                                _controller!.value.duration.inMilliseconds
+                                    .toDouble(),
+                              ),
+                          onChanged: (value) {
+                            _controller!.seekTo(
+                              Duration(milliseconds: value.toInt()),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    _formatDuration(_controller!.value.duration),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
+                    Text(
+                      _formatDuration(_controller!.value.duration),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   String _formatDuration(Duration duration) {
     final mins = duration.inMinutes;

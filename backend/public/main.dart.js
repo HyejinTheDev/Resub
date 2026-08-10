@@ -27866,7 +27866,8 @@ s.d=B.pd
 s.e=B.pd
 s=A.Va()
 n=s.gyi(s)
-if(!(B.c.q(n,"localhost")||B.c.q(n,"127.0.0.1")))o.b=n
+if(!(B.c.q(n,"localhost")||B.c.q(n,"127.0.0.1")))if(!B.c.q(n,"hf.space"))o.b="https://hyejin1-resub-dich-long-tieng.hf.space"
+else o.b=n
 if($.ac==null)A.aSz()
 s=$.ac
 s.toString
@@ -28639,7 +28640,7 @@ aEr:function aEr(a,b){this.a=a
 this.b=b},
 aEs:function aEs(a){this.a=a},
 aEy:function aEy(a){this.a=a},
-aEA:function aEA(a){this.a=a},
+aEA:function aEA(){},
 aEz:function aEz(a,b){this.a=a
 this.b=b},
 aE8:function aE8(a){this.a=a},
@@ -98518,7 +98519,7 @@ g=A.a1(h).h("a9<1,aA<l,y>>")
 e=A.aa(new A.a9(h,new A.awJ(),g),g.h("av.E"))
 h=t.N
 g=t.z
-d=A.a5(["fontSize",a4.x,"yPercent",a4.y,"color",a4.z,"outlineColor",a4.Q,"bold",!1,"italic",!1],h,g)
+d=A.a5(["fontSize",a4.x,"yPercent",a4.y,"color",a4.z,"outlineColor",a4.Q,"bold",!0,"italic",!1],h,g)
 g=A.E(h,g)
 h=a4.c
 c=J.ad(h)
@@ -98533,8 +98534,8 @@ g.m(0,"bgVolume",a4.e)
 g.m(0,"ttsVolume",a4.f)
 g.m(0,"defaultVoice",a4.r)
 g.m(0,"capcutCookie",a4.w)
-g.m(0,"quality",n.d)
-g.m(0,"resolution",n.e)
+g.m(0,"exportQuality",n.d)
+g.m(0,"exportResolution",n.e+"p")
 g.m(0,"burnSubtitles",n.f)
 g.m(0,"videoSpeed",0.7)
 if(i!=null)g.m(0,"userId",i)
@@ -99898,7 +99899,7 @@ q=A.aR(o,A.bc(A.b([r,A.cT(A.ib(!1,o,!0,A.aR(o,A.au("Ph\u1ee5 \u0111\u1ec1",o,o,o
 if(n.w===0)n=l.length===0?A.iC(o,o,new A.aEx(n),t.g,t.Xd):n.abp(a,b)
 else if(l.length===0)n=B.Gc
 else if(!s)n=A.dB(A.bv(A.b([B.Ml,B.Y,B.a3z,B.cW,B.a49,B.a1,A.fA(!1,B.a2X,o,o,o,o,o,o,new A.aEy(a),o,A.dj(o,o,B.m,o,o,o,o,o,o,B.k,o,o,o,o,o,o,o,o,o,o))],p),B.t,B.aO,B.n),o,o)
-else n=b.a.length===0?A.Nq(new A.aEz(n,b),new A.aEA(b),t.g,t.Xd):n.abB(a,b)
+else n=b.a.length===0?A.Nq(new A.aEz(n,b),new A.aEA(),t.g,t.Xd):n.abB(a,b)
 return A.aR(o,A.bv(A.b([q,A.cT(n,1)],p),B.Z,B.q,B.n),B.l,B.f8,o,o,o,o,o,o,o,o,o)},
 $S:233}
 A.aEv.prototype={
@@ -99964,7 +99965,7 @@ A.aEy.prototype={
 $0(){J.aJ(A.aB(this.a,!1,t.F),B.jQ)},
 $S:0}
 A.aEA.prototype={
-$2(a,b){if(b instanceof A.D7){J.aJ(A.aB(a,!1,t.F),new A.rZ(b.a,b.b,b.c,this.a.c))
+$2(a,b){if(b instanceof A.D7){J.aJ(A.aB(a,!1,t.F),new A.rZ(b.a,b.b,b.c,b.d))
 J.aJ(A.aB(a,!1,t.g),new A.kw())
 a.a5(t.J).f.dB(B.Xp)}},
 $S:96}

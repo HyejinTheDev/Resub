@@ -768,7 +768,7 @@ class _SubtitleListPanelState extends State<SubtitleListPanel> {
                                                 subtitles: importState.subtitles,
                                                 detectedY: importState.detectedY,
                                                 detectedHeight: importState.detectedHeight,
-                                                videoData: state.videoData,
+                                                videoData: importState.videoData,
                                               ));
                                           context.read<ImportBloc>().add(ResetImportEvent());
                                           ScaffoldMessenger.of(context).showSnackBar(

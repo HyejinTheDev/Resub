@@ -280,7 +280,7 @@ class LandingScreen extends StatelessWidget {
               _buildFeatureCard(
                 icon: Icons.speed_rounded,
                 title: 'Xử lý tốc độ cao',
-                description: 'Nhận diện và dịch lồng tiếng cho video dài 5 phút chỉ trong chưa đầy 30 giây.',
+                description: 'Nhận diện và dịch lồng tiếng tốc độ cao cho cả video dài.',
               ),
             ],
           ),

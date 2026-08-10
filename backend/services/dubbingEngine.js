@@ -200,7 +200,14 @@ const CAPCUT_VOICES = {
   'capcut-kennydaide': { speaker: 'BV075_streaming_demon_dsp', item_id: '7569442422665661712' }
 };
 
-const PREVIEW_WIDTH = 480;
+// Subtitle sizes in the Flutter editor are authored against a 432px-high
+// preview. Scale from video height on both sides so responsive editor widths
+// and different export resolutions keep the same visual proportions.
+const SUBTITLE_PREVIEW_REFERENCE_HEIGHT = 432;
+// libass renders larger than Flutter at the same nominal font size. Calibrate
+// the ASS glyph metrics to the editor, and halve Flutter's centered stroke for
+// ASS because an ASS outline expands fully outwards from the glyph edge.
+const ASS_FONT_METRIC_FACTOR = 0.75;
 
 
 async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
@@ -323,7 +330,7 @@ async function generateCapCutTTS(text, voiceKey, outputPath, capcutCookie) {
   return outputPath;
 }
 
-async function generateTTS(text, voice = 'vi-VN-HoaiMyNeural', outputPath, capcutCookie = '') {
+async function generateTTS(text, voice = 'capcut-cogaihoatngon', outputPath, capcutCookie = '') {
   const cleanText = (text || '').trim();
   const cleanVoice = (voice || '').trim();
   
@@ -513,7 +520,8 @@ async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume,
   const videoDurSec = await getAudioDuration(videoPath);
   const parsedSpeed = parseFloat(videoSpeed) || 1.0;
   const speedFactor = 1.0 / parsedSpeed;
-  const safeDur = Math.max(1, Math.ceil((videoDurSec * speedFactor) || 60));
+  const targetDur = videoDurSec > 0 ? videoDurSec * speedFactor : 0;
+  const safeDur = Math.max(1, Math.ceil(targetDur || 60));
 
   const ttsMixedPath = path.join(cwd, 'tts_only.wav');
   if (ttsFiles.length > 0) {
@@ -543,7 +551,14 @@ async function buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume,
     }
   }
 
-  args.push('-filter_complex', graph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', mixedAudioPath);
+  args.push('-filter_complex', graph, '-map', '[aout]', '-vn', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2');
+  // A delayed/long TTS clip must not extend the exported movie beyond the
+  // source video timeline. Otherwise the final mux keeps running after the
+  // last video frame (and transform backgrounds appear as a black tail).
+  if (targetDur > 0) {
+    args.push('-t', targetDur.toFixed(3));
+  }
+  args.push(mixedAudioPath);
   await runFfmpeg(ffmpeg, args, cancelToken, cwd);
 
   const stat = fs.statSync(mixedAudioPath);
@@ -693,13 +708,13 @@ function formatMsToAssTime(ms) {
  * exact center point the editor preview uses — so burned-in subtitles match the
  * position, size and wrap width seen while editing.
  */
-function generateAssFile(subtitles, assPath, { width, height, fontSize, style }) {
+function generateAssFile(subtitles, assPath, { width, height, fontSize, outlineWidth, style }) {
   const s = style || {};
   const primary = hexToAssColor(s.color || '#ffffff');
   const isBoxPreset = s.textColorPreset && s.textColorPreset.includes('-bg');
   const borderStyle = isBoxPreset ? 3 : 1;
   const outlineColour = isBoxPreset ? '&H80000000' : hexToAssColor(s.outlineColor || '#000000');
-  const outline = isBoxPreset ? 2 : (s.outlineWidth !== undefined ? s.outlineWidth : 3.5);
+  const outline = isBoxPreset ? 2 : outlineWidth;
   const bold = s.bold ? -1 : 0;
   const italic = s.italic ? -1 : 0;
 
@@ -721,7 +736,7 @@ function generateAssFile(subtitles, assPath, { width, height, fontSize, style })
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},2.5,5,${marginH},${marginH},0,1`,
+    `Style: Default,Arial,${fontSize},${primary},&H000000FF,${outlineColour},&H80000000,${bold},${italic},0,0,100,100,0,0,${borderStyle},${outline},0,5,${marginH},${marginH},0,1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
@@ -754,7 +769,7 @@ function hexToAssColor(hex) {
 async function exportDubbedVideo({
   videoPath,
   subtitles,
-  voice = 'vi-VN-HoaiMyNeural',
+  voice = 'capcut-cogaihoatngon',
   outputPath,
   bgVolume = 0.15,
   ttsVolume = 1.0,
@@ -907,6 +922,12 @@ async function exportDubbedVideo({
     const mixedAudioPath = path.join(tempDir, 'mixed_audio.m4a');
     await buildMixedAudio(ffmpeg, videoPath, ttsFiles, bgVolume, ttsVolume, mixedAudioPath, cancelToken, tempDir, videoSpeed);
 
+    const videoDurationSec = await getAudioDuration(videoPath);
+    const targetDurationSec = videoDurationSec > 0 ? videoDurationSec * speedFactor : 0;
+    const durationLimitArgs = targetDurationSec > 0
+      ? ['-t', targetDurationSec.toFixed(3)]
+      : [];
+
     // Video filter graph (transform, blur, crop, scale, subtitles) is built below;
     // segments are appended with a leading ';' and the first one is stripped before use.
     let filterGraph = '';
@@ -938,17 +959,22 @@ async function exportDubbedVideo({
       }
     }
 
-    // 4. Subtitle file generation — ASS with exact anchor point matching the preview.
-    // The editor preview renders inside a 480px-wide container, so a CSS font of
-    // `fs` px corresponds to fs/480 of the video WIDTH.
+    // 4. Subtitle file generation — ASS with the same height-relative sizing
+    // used by the responsive Flutter preview.
     const cssFontSize = (subtitleStyle && subtitleStyle.fontSize) || 10;
-    const assFontSize = Math.max(6, Math.round((cssFontSize * 1.5) * (targetWidth / PREVIEW_WIDTH)));
+    const subtitleScale = targetHeight / SUBTITLE_PREVIEW_REFERENCE_HEIGHT;
+    const assFontSize = Math.max(
+      6,
+      Math.round((cssFontSize * 1.5) * subtitleScale * ASS_FONT_METRIC_FACTOR)
+    );
+    const assOutlineWidth = Math.max(1, Number((2.5 * subtitleScale).toFixed(2)));
 
     const assPath = path.join(tempDir, 'subtitles.ass');
     generateAssFile(subtitles, assPath, {
       width: targetWidth,
       height: targetHeight,
       fontSize: assFontSize,
+      outlineWidth: assOutlineWidth,
       style: subtitleStyle
     });
 
@@ -1097,6 +1123,7 @@ async function exportDubbedVideo({
         '-b:a', '192k',
         '-ar', '44100',
         '-ac', '2',
+        ...durationLimitArgs,
         '-movflags', '+faststart',
         outputPath
       ];
@@ -1128,6 +1155,7 @@ async function exportDubbedVideo({
         '-b:a', '192k',
         '-ar', '44100',
         '-ac', '2',
+        ...durationLimitArgs,
         '-movflags', '+faststart',
         outputPath
       ];
@@ -1138,8 +1166,6 @@ async function exportDubbedVideo({
     }
     console.log(`[dubbingEngine] Running FFmpeg video pass (${ttsFiles.length} TTS tracks pre-mixed)...`);
     onProgress({ percent: 60, message: 'Đang chèn phụ đề & xử lý hình ảnh (FFmpeg)...' });
-
-    const videoDurationSec = await getAudioDuration(videoPath);
 
     await new Promise((resolve, reject) => {
       const proc = spawn(ffmpeg, ffmpegArgs, { cwd: tempDir });

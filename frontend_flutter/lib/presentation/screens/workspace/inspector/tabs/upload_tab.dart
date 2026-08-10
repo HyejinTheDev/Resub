@@ -139,7 +139,7 @@ class _UploadTabState extends State<UploadTab> {
             ),
             SizedBox(height: 4),
             Text(
-              'Định dạng .mp4, .mov (Tối đa 5 phút)',
+              'Định dạng .mp4, .mov (Không giới hạn thời lượng)',
               style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ],

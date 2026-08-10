@@ -19,6 +19,8 @@ class ApiClient {
       final String origin = Uri.base.origin;
       if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
         _baseUrl = 'http://localhost:3051';
+      } else if (!origin.contains('hf.space')) {
+        _baseUrl = 'https://hyejin1-resub-dich-long-tieng.hf.space';
       } else {
         _baseUrl = origin;
       }

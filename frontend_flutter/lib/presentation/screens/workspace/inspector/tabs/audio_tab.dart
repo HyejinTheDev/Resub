@@ -129,6 +129,7 @@ class _AudioTabState extends State<AudioTab> {
                 onChanged: (val) {
                   if (val != null) {
                     context.read<WorkspaceBloc>().add(UpdateSettingsEvent(defaultVoice: val));
+                    context.read<WorkspaceBloc>().add(BulkVoiceChangeEvent(val));
                   }
                 },
               ),

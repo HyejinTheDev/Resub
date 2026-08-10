@@ -118,7 +118,7 @@ class _ExportTabState extends State<ExportTab> {
       'yPercent': state.subtitleYPercent,
       'color': state.subtitleColor,
       'outlineColor': state.subtitleOutlineColor,
-      'bold': false,
+      'bold': true,
       'italic': false,
     };
 
@@ -132,8 +132,8 @@ class _ExportTabState extends State<ExportTab> {
       'ttsVolume': state.ttsVolume,
       'defaultVoice': state.defaultVoice,
       'capcutCookie': state.capcutCookie,
-      'quality': _quality,
-      'resolution': _resolution,
+      'exportQuality': _quality,
+      'exportResolution': '${_resolution}p',
       'burnSubtitles': _burnSubtitles,
       'videoSpeed': _videoSpeed,
       if (userId != null) 'userId': userId,
@@ -179,14 +179,17 @@ class _ExportTabState extends State<ExportTab> {
           if (mounted) {
             final authState = context.read<AuthBloc>().state;
             if (authState is Authenticated) {
-              context.read<AuthBloc>().add(RefreshProfileEvent(userId: authState.user.id));
+              context.read<AuthBloc>().add(
+                RefreshProfileEvent(userId: authState.user.id),
+              );
             }
           }
         } else if (status == 'error') {
           timer.cancel();
           setState(() {
             _isExporting = false;
-            _statusMessage = progress['error'] ?? 'Lỗi kết xuất FFmpeg từ máy chủ';
+            _statusMessage =
+                progress['error'] ?? 'Lỗi kết xuất FFmpeg từ máy chủ';
           });
         } else {
           setState(() {
@@ -235,7 +238,11 @@ class _ExportTabState extends State<ExportTab> {
               // Section 1: Settings
               const Text(
                 'TÙY CHỌN ĐẦU RA VIDEO',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textMuted,
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -248,9 +255,27 @@ class _ExportTabState extends State<ExportTab> {
                 ),
                 dropdownColor: AppColors.surface,
                 items: const [
-                  DropdownMenuItem(value: 'low', child: Text('Thấp (Nhanh nhất - ultrafast)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 'medium', child: Text('Trung bình (Cân bằng - superfast)', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: 'high', child: Text('Cao (Tốt nhất - medium)', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(
+                    value: 'low',
+                    child: Text(
+                      'Thấp (Nhanh nhất - ultrafast)',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'medium',
+                    child: Text(
+                      'Trung bình (Cân bằng - superfast)',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'high',
+                    child: Text(
+                      'Cao (Tốt nhất - medium)',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ],
                 onChanged: _isExporting
                     ? null
@@ -273,9 +298,27 @@ class _ExportTabState extends State<ExportTab> {
                 ),
                 dropdownColor: AppColors.surface,
                 items: const [
-                  DropdownMenuItem(value: '1080', child: Text('FullHD 1080p', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: '720', child: Text('HD 720p', style: TextStyle(color: Colors.white))),
-                  DropdownMenuItem(value: '480', child: Text('SD 480p', style: TextStyle(color: Colors.white))),
+                  DropdownMenuItem(
+                    value: '1080',
+                    child: Text(
+                      'FullHD 1080p',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: '720',
+                    child: Text(
+                      'HD 720p',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: '480',
+                    child: Text(
+                      'SD 480p',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ],
                 onChanged: _isExporting
                     ? null
@@ -288,8 +331,6 @@ class _ExportTabState extends State<ExportTab> {
                       },
               ),
               const SizedBox(height: 16),
-
-
 
               // Burn subtitles toggle
               Row(
@@ -309,7 +350,7 @@ class _ExportTabState extends State<ExportTab> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
               const Divider(color: AppColors.border),
               const SizedBox(height: 12),
@@ -326,7 +367,10 @@ class _ExportTabState extends State<ExportTab> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.timer_outlined, color: AppColors.warning),
+                      const Icon(
+                        Icons.timer_outlined,
+                        color: AppColors.warning,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -334,12 +378,18 @@ class _ExportTabState extends State<ExportTab> {
                           children: [
                             const Text(
                               'Thời gian xuất dự kiến:',
-                              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               _getEstimatedTimeStr(durationSec),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -348,13 +398,14 @@ class _ExportTabState extends State<ExportTab> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Export Quota Display
                 BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, authState) {
                     if (authState is Authenticated) {
                       final user = authState.user;
-                      final remaining = user.videoExportQuota - user.videoExportUsed;
+                      final remaining =
+                          user.videoExportQuota - user.videoExportUsed;
                       final tier = user.subscriptionTier.toUpperCase();
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
@@ -363,14 +414,20 @@ class _ExportTabState extends State<ExportTab> {
                           children: [
                             Text(
                               'Gói tài khoản: $tier',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white70,
+                              ),
                             ),
                             Text(
                               'Còn lại: ${remaining < 0 ? 0 : remaining} / ${user.videoExportQuota} lượt xuất',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: remaining <= 0 ? Colors.redAccent : AppColors.primary,
+                                color: remaining <= 0
+                                    ? Colors.redAccent
+                                    : AppColors.primary,
                               ),
                             ),
                           ],
@@ -380,19 +437,22 @@ class _ExportTabState extends State<ExportTab> {
                     return const SizedBox();
                   },
                 ),
-                
+
                 // Export Button
                 ElevatedButton(
                   onPressed: () => _startExport(context, state),
                   child: const Text('BẮT ĐẦU XUẤT VIDEO DỊCH'),
                 ),
-                
+
                 if (_statusMessage.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
                     _statusMessage,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.error, fontSize: 12),
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ] else if (_isExporting) ...[
@@ -402,20 +462,28 @@ class _ExportTabState extends State<ExportTab> {
                   children: [
                     const Text(
                       'Đang xử lý ghép phụ đề & giọng đọc...',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     LinearProgressIndicator(
                       value: _exportProgress,
                       minHeight: 8,
                       backgroundColor: AppColors.border,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '${(_exportProgress * 100).toStringAsFixed(0)}% — $_statusMessage',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     OutlinedButton(
@@ -433,12 +501,19 @@ class _ExportTabState extends State<ExportTab> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Icon(Icons.check_circle, color: AppColors.primary, size: 48),
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.primary,
+                      size: 48,
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'Xuất Video Thành Công!',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -449,7 +524,9 @@ class _ExportTabState extends State<ExportTab> {
                         Clipboard.setData(ClipboardData(text: _downloadUrl!));
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Đã sao chép liên kết tải video vào bộ nhớ tạm!'),
+                            content: Text(
+                              'Đã sao chép liên kết tải video vào bộ nhớ tạm!',
+                            ),
                             backgroundColor: AppColors.primary,
                           ),
                         );
@@ -460,7 +537,10 @@ class _ExportTabState extends State<ExportTab> {
                     Text(
                       _downloadUrl!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextButton(
@@ -518,7 +598,10 @@ class _ExportTabState extends State<ExportTab> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF131520),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.5),
@@ -539,32 +622,58 @@ class _ExportTabState extends State<ExportTab> {
                         const SizedBox(height: 18),
                         const Text(
                           'Nâng Cấp Gói PRO',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         if (checkPaymentTimer == null) ...[
                           Text(
                             'Nâng cấp lên gói PRO để nhận ngay 100 lượt xuất video chất lượng cao cùng các quyền lợi ưu tiên.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), height: 1.4),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              height: 1.4,
+                            ),
                           ),
                           const SizedBox(height: 20),
-                          _buildFeatureItem(Icons.movie_filter_outlined, '100 lượt xuất video chất lượng cao'),
+                          _buildFeatureItem(
+                            Icons.movie_filter_outlined,
+                            '100 lượt xuất video chất lượng cao',
+                          ),
                           const SizedBox(height: 10),
-                          _buildFeatureItem(Icons.timer_outlined, 'Cho phép xuất video thời lượng dài hơn'),
+                          _buildFeatureItem(
+                            Icons.timer_outlined,
+                            'Cho phép xuất video thời lượng dài hơn',
+                          ),
                           const SizedBox(height: 10),
-                          _buildFeatureItem(Icons.bolt_rounded, 'Ưu tiên kết xuất tốc độ tối đa'),
+                          _buildFeatureItem(
+                            Icons.bolt_rounded,
+                            'Ưu tiên kết xuất tốc độ tối đa',
+                          ),
                           const SizedBox(height: 28),
                           Row(
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: () => Navigator.of(dialogContext).pop(),
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.white60,
-                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    side: BorderSide(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                   child: const Text('Bỏ qua'),
                                 ),
@@ -575,27 +684,48 @@ class _ExportTabState extends State<ExportTab> {
                                   onPressed: isGeneratingLink
                                       ? null
                                       : () async {
-                                          final authBloc = BlocProvider.of<AuthBloc>(context);
-                                          final messenger = ScaffoldMessenger.of(context);
+                                          final authBloc =
+                                              BlocProvider.of<AuthBloc>(
+                                                context,
+                                              );
+                                          final messenger =
+                                              ScaffoldMessenger.of(context);
                                           setDialogState(() {
                                             isGeneratingLink = true;
                                           });
                                           try {
-                                             final result = await authRepository.createPaymentLink(userId);
-                                             final checkoutUrl = result['checkoutUrl']?.toString() ?? '';
-                                              if (checkoutUrl.isNotEmpty && result['bankId'] == null) {
-                                                await launchUrl(Uri.parse(checkoutUrl), mode: LaunchMode.externalApplication);
-                                              }
-                                            
+                                            final result = await authRepository
+                                                .createPaymentLink(userId);
+                                            final checkoutUrl =
+                                                result['checkoutUrl']
+                                                    ?.toString() ??
+                                                '';
+                                            if (checkoutUrl.isNotEmpty &&
+                                                result['bankId'] == null) {
+                                              await launchUrl(
+                                                Uri.parse(checkoutUrl),
+                                                mode: LaunchMode
+                                                    .externalApplication,
+                                              );
+                                            }
+
                                             // Start polling for payment success
                                             setDialogState(() {
                                               activePaymentData = result;
                                               isGeneratingLink = false;
-                                              checkPaymentTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-                                                if (mounted) {
-                                                  authBloc.add(RefreshProfileEvent(userId: userId));
-                                                }
-                                              });
+                                              checkPaymentTimer =
+                                                  Timer.periodic(
+                                                    const Duration(seconds: 3),
+                                                    (timer) {
+                                                      if (mounted) {
+                                                        authBloc.add(
+                                                          RefreshProfileEvent(
+                                                            userId: userId,
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
+                                                  );
                                             });
                                           } catch (e) {
                                             setDialogState(() {
@@ -603,8 +733,14 @@ class _ExportTabState extends State<ExportTab> {
                                             });
                                             messenger.showSnackBar(
                                               SnackBar(
-                                                content: Text(e.toString().replaceAll('Exception: ', '')),
-                                                backgroundColor: AppColors.error,
+                                                content: Text(
+                                                  e.toString().replaceAll(
+                                                    'Exception: ',
+                                                    '',
+                                                  ),
+                                                ),
+                                                backgroundColor:
+                                                    AppColors.error,
                                               ),
                                             );
                                           }
@@ -612,18 +748,27 @@ class _ExportTabState extends State<ExportTab> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.primary,
                                     foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                   child: isGeneratingLink
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.black,
+                                          ),
                                         )
                                       : const Text(
                                           'Thanh Toán QR',
-                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                 ),
                               ),
@@ -650,31 +795,50 @@ class _ExportTabState extends State<ExportTab> {
                             const SizedBox(height: 16),
                             const Text(
                               'Đang Chờ Chuyển Khoản...',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Vui lòng quét mã QR ở trên để chuyển khoản 199.000đ.\n\nNội dung chuyển khoản: RSB ${activePaymentData!['orderCode']}',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                height: 1.4,
+                              ),
                             ),
                           ] else ...[
                             const SizedBox(height: 10),
                             const SizedBox(
                               width: 40,
                               height: 40,
-                              child: CircularProgressIndicator(strokeWidth: 3.5, color: AppColors.primary),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3.5,
+                                color: AppColors.primary,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             const Text(
                               'Đang Chờ Chuyển Khoản...',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Vui lòng quét mã QR trên trang thanh toán vừa mở để chuyển khoản 199.000đ.\n\nHệ thống sẽ tự động kích hoạt tài khoản ngay sau khi nhận được tiền.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6), height: 1.4),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                height: 1.4,
+                              ),
                             ),
                           ],
                           const SizedBox(height: 28),
@@ -685,10 +849,14 @@ class _ExportTabState extends State<ExportTab> {
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white60,
-                              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               minimumSize: const Size(double.infinity, 44),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                             child: const Text('Hủy giao dịch'),
                           ),

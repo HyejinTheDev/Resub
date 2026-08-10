@@ -38,7 +38,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       emit(state.copyWith(storyboard: event.storyboard));
     });
     on<UpdateSubtitlesEvent>((event, emit) {
-      emit(state.copyWith(subtitles: event.subtitles));
+      final updated = event.subtitles
+          .map((sub) => sub.copyWith(voice: state.defaultVoice))
+          .toList();
+      emit(state.copyWith(subtitles: updated));
     });
     on<ResetWorkspaceEvent>((event, emit) {
       final newProjId = 'project-${DateTime.now().millisecondsSinceEpoch}';
@@ -56,6 +59,9 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   }
 
   void _onInitialize(InitializeWorkspaceEvent event, Emitter<WorkspaceState> emit) {
+    final initializedSubtitles = event.subtitles
+        .map((sub) => sub.copyWith(voice: defaultWorkspaceVoice))
+        .toList();
     // Generate an initial default blur mask covering the whole video at the detected Y coordinate
     final List<BlurMask> defaultMasks = [];
     if (event.detectedHeight > 0) {
@@ -73,7 +79,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     }
 
     emit(WorkspaceState(
-      subtitles: event.subtitles,
+      subtitles: initializedSubtitles,
       blurMasks: defaultMasks,
       videoData: event.videoData,
       subtitleYPercent: event.detectedY.toDouble(),
@@ -172,7 +178,10 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   }
 
   void _onLoadProject(LoadProjectWorkspaceEvent event, Emitter<WorkspaceState> emit) {
-    final subs = event.project.subtitles.map((json) => Subtitle.fromJson(json as Map<String, dynamic>)).toList();
+    final subs = event.project.subtitles
+        .map((json) => Subtitle.fromJson(json as Map<String, dynamic>))
+        .map((sub) => sub.copyWith(voice: defaultWorkspaceVoice))
+        .toList();
     final masks = event.project.blurMasks.map((json) => BlurMask.fromJson(json as Map<String, dynamic>)).toList();
     
     final double fs = (event.project.subtitleStyle['fontSize'] as num?)?.toDouble() ?? 10.0;
@@ -191,7 +200,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       subtitleOutlineColor: ocol,
       bgVolume: (event.project.videoData['bgVolume'] as num?)?.toDouble() ?? 0.15,
       ttsVolume: (event.project.videoData['ttsVolume'] as num?)?.toDouble() ?? 1.0,
-      defaultVoice: event.project.videoData['defaultVoice']?.toString() ?? 'vi-VN-HoaiMyNeural',
+      defaultVoice: defaultWorkspaceVoice,
       capcutCookie: event.project.videoData['capcutCookie']?.toString() ?? '',
     ));
   }
