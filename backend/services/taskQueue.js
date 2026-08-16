@@ -58,7 +58,8 @@ class TaskQueue {
 
     let finished = false;
     // Auto-timeout job after 6 minutes (360,000 ms) to prevent server hangs
-    const timeoutMs = 360000;
+    // Auto-timeout job after 60 minutes (3,600,000 ms) to prevent server hangs
+    const timeoutMs = parseInt(process.env.EXPORT_TIMEOUT_MS, 10) || 3600000;
     const timeoutId = setTimeout(() => {
       if (!finished) {
         finished = true;
