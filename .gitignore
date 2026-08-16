@@ -29,3 +29,6 @@ backend/downloads/*
 *.wav
 *.srt
 *.log
+
+# Oracle JDK runtime
+backend/services/oracleJdk-26/
