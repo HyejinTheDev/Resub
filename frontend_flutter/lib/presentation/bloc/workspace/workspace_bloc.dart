@@ -198,7 +198,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       subtitleYPercent: yp,
       subtitleColor: col,
       subtitleOutlineColor: ocol,
-      bgVolume: (event.project.videoData['bgVolume'] as num?)?.toDouble() ?? 0.15,
+      bgVolume: (event.project.videoData['bgVolume'] as num?)?.toDouble() ?? 0.0,
       ttsVolume: (event.project.videoData['ttsVolume'] as num?)?.toDouble() ?? 1.0,
       defaultVoice: defaultWorkspaceVoice,
       capcutCookie: event.project.videoData['capcutCookie']?.toString() ?? '',

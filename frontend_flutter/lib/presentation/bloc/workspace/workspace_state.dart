@@ -35,7 +35,7 @@ class WorkspaceState extends Equatable {
     this.blurMasks = const [],
     this.videoData = const {},
     this.storyboard = const {},
-    this.bgVolume = 0.15,
+    this.bgVolume = 0.0,
     this.ttsVolume = 1.0,
     this.defaultVoice = defaultWorkspaceVoice,
     this.capcutCookie = '',
