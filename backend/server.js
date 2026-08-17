@@ -7,8 +7,8 @@ const mongoose = require('mongoose');
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (MONGODB_URI) {
-  mongoose.connect(MONGODB_URI)
-    .then(() => console.log('🍃 Connected to MongoDB successfully!'))
+  mongoose.connect(MONGODB_URI, { dbName: 'resub' })
+    .then(() => console.log(`🍃 Connected to MongoDB successfully! Database: ${mongoose.connection.name}`))
     .catch((err) => console.error('❌ MongoDB connection failed:', err.message));
 } else {
   console.warn('⚠️ WARNING: MONGODB_URI is not configured in .env. Database connection is inactive.');
