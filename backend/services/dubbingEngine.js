@@ -54,15 +54,15 @@ async function reportBadCookieToManager(cookie) {
 
 // Mappings for FFmpeg video quality preset & CRF (Constant Rate Factor)
 const qualityCrfMap = {
-  high: '18',
-  medium: '23',
-  low: '28'
+  high: '17',
+  medium: '20',
+  low: '24'
 };
 
 const presetMap = {
-  high: 'medium',
-  medium: 'superfast',
-  low: 'ultrafast'
+  high: 'fast',
+  medium: 'veryfast',
+  low: 'superfast'
 };
 
 function fetchUrl(url, method = 'GET', headers = {}, body = null) {

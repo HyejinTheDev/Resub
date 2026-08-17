@@ -21,8 +21,8 @@ class ExportTab extends StatefulWidget {
 }
 
 class _ExportTabState extends State<ExportTab> {
-  String _quality = 'medium'; // low, medium, high
-  String _resolution = '720'; // 1080, 720, 480
+  String _quality = 'high'; // low, medium, high
+  String _resolution = '1080'; // 1080, 720, 480
   bool _burnSubtitles = true;
   double _videoSpeed = 0.7;
 
