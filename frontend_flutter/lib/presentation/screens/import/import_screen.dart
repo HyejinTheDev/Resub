@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../bloc/import/import_bloc.dart';
@@ -186,9 +187,25 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _downloadSegment(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
+    try {
+      final uri = Uri.parse(url);
+      await Clipboard.setData(ClipboardData(text: url));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Đã sao chép liên kết tải phân đoạn video vào bộ nhớ tạm (Clipboard)! Bạn có thể dán vào tab mới để tải về.',
+            ),
+            backgroundColor: AppColors.primary,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Could not launch $url: $e');
     }
   }
 
