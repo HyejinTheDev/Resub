@@ -99016,7 +99016,7 @@ s.c8(0,new A.atB(),t.Tz)},
 amO(a,b){var s=a.a,r=A.a1(s).h("a6<1,cV>"),q=A.a9(new A.a6(s,new A.att(),r),r.h("at.E")),p=A.b([],t.eH)
 r=a.c
 if(r>0){s=s.length!==0?B.b.gaj(s).b:"99m59s999ms"
-p.push(new A.fX("00m00s000ms",s,a.b,r,50,100,15,"#000000",0.15,!0))}s=A.atJ(0.15,p,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",a.b,q,1,a.d,0)
+p.push(new A.fX("00m00s000ms",s,a.b,r,50,100,15,"#000000",0.15,!0))}s=A.atJ(0,p,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",a.b,q,1,a.d,0)
 if(!b.d)b.a.$1(s)},
 anY(a,b){var s=this.c
 s=s.awI(a.a,a.b,a.c)
@@ -99090,7 +99090,7 @@ j=k.y
 i=J.ab(j)
 r=A.hV(i.i(j,"bgVolume"))
 if(r==null)r=l
-if(r==null)r=0.15
+if(r==null)r=0
 m=A.hV(i.i(j,"ttsVolume"))
 if(m==null)m=l
 if(m==null)m=1
@@ -99153,7 +99153,7 @@ A.atq.prototype={
 $1(a){return a.DJ(this.a.c.r)},
 $S:92}
 A.atB.prototype={
-$2(a,b){var s=A.atJ(0.15,B.qR,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",85,B.qS,1,A.a5(["projectId","project-"+Date.now(),"projectName","D\u1ef1 \xe1n m\u1edbi","addedToTimeline",!1],t.N,t.z),0)
+$2(a,b){var s=A.atJ(0,B.qR,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",85,B.qS,1,A.a5(["projectId","project-"+Date.now(),"projectName","D\u1ef1 \xe1n m\u1edbi","addedToTimeline",!1],t.N,t.z),0)
 if(!b.d)b.a.$1(s)},
 $S:629}
 A.att.prototype={
@@ -112479,7 +112479,7 @@ B.nz=new A.cH(5,"scrolledUnder")
 B.A=new A.cH(6,"disabled")
 B.dm=new A.cH(7,"error")
 B.a7B=new A.zd(null)
-B.a7C=new A.bp(B.qS,B.qR,B.c_,B.c_,0.15,1,"capcut-cogaihoatngon","",10,85,"#EAB308","#000000",-1,-1,0,!1,0,null)
+B.a7C=new A.bp(B.qS,B.qR,B.c_,B.c_,0,1,"capcut-cogaihoatngon","",10,85,"#EAB308","#000000",-1,-1,0,!1,0,null)
 B.e1=new A.qo(0,"start")
 B.a7D=new A.qo(1,"end")
 B.a7E=new A.qo(2,"center")
