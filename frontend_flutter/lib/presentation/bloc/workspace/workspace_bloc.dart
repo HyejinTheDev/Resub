@@ -71,7 +71,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         yPercentage: event.detectedY.toDouble(),
         heightPercentage: event.detectedHeight.toDouble(),
         xPercentage: 50.0,
-        widthPercentage: 80.0,
+        widthPercentage: 100.0,
         blurRadius: 15.0,
         color: '#000000',
         opacity: 0.15,

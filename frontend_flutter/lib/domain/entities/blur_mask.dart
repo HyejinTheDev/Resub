@@ -58,7 +58,7 @@ class BlurMask extends Equatable {
       yPercentage: (json['yPercentage'] as num?)?.toDouble() ?? 50.0,
       heightPercentage: (json['heightPercentage'] as num?)?.toDouble() ?? 100.0,
       xPercentage: (json['xPercentage'] as num?)?.toDouble() ?? 50.0,
-      widthPercentage: (json['widthPercentage'] as num?)?.toDouble() ?? 80.0,
+      widthPercentage: (json['widthPercentage'] as num?)?.toDouble() ?? 100.0,
       blurRadius: (json['blurRadius'] as num?)?.toDouble() ?? 15.0,
       color: json['color']?.toString() ?? '#000000',
       opacity: (json['opacity'] as num?)?.toDouble() ?? 0.15,

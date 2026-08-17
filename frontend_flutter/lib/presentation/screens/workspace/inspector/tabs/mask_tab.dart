@@ -40,7 +40,7 @@ class MaskTab extends StatelessWidget {
                         yPercentage: 80.0,
                         heightPercentage: 15.0,
                         xPercentage: 50.0,
-                        widthPercentage: 80.0,
+                        widthPercentage: 100.0,
                         blurRadius: 25.0, // Default to higher radius for stronger blur
                         color: '#000000', // Default to black tint cover
                         opacity: 0.4,     // Default to 40% opacity
