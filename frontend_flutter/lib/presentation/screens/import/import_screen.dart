@@ -189,16 +189,49 @@ class _ImportScreenState extends State<ImportScreen> {
   Future<void> _downloadSegment(String url) async {
     try {
       final uri = Uri.parse(url);
-      await Clipboard.setData(ClipboardData(text: url));
+      
+      try {
+        await Clipboard.setData(ClipboardData(text: url));
+      } catch (clipError) {
+        debugPrint('Clipboard copy failed: $clipError');
+      }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Đã sao chép liên kết tải phân đoạn video vào bộ nhớ tạm (Clipboard)! Bạn có thể dán vào tab mới để tải về.',
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Tải về phân đoạn video'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Môi trường Hugging Face chặn mở link tự động. Hãy sao chép liên kết tải dưới đây và dán vào tab mới để tải về:'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: SelectableText(
+                    url,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            backgroundColor: AppColors.primary,
-            duration: Duration(seconds: 4),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ĐÓNG'),
+              ),
+            ],
           ),
         );
       }
@@ -520,13 +553,15 @@ class _ImportScreenState extends State<ImportScreen> {
                                   vertical: 6,
                                 ),
                                 minimumSize: Size.zero,
-                                backgroundColor: Colors.white.withValues(
-                                  alpha: 0.05,
-                                ),
+                                backgroundColor: Colors.blueAccent,
+                                foregroundColor: Colors.white,
                               ),
                               child: const Text(
                                 'Tải về',
-                                style: TextStyle(fontSize: 11),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 6),
