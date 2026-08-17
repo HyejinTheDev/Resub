@@ -99011,7 +99011,7 @@ s.c8(0,new A.atB(),t.Tz)},
 amO(a,b){var s=a.a,r=A.a1(s).h("a6<1,cV>"),q=A.a9(new A.a6(s,new A.att(),r),r.h("at.E")),p=A.b([],t.eH)
 r=a.c
 if(r>0){s=s.length!==0?B.b.gaj(s).b:"99m59s999ms"
-p.push(new A.fX("00m00s000ms",s,a.b,r,50,80,15,"#000000",0.15,!0))}s=A.atJ(0.15,p,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",a.b,q,1,a.d,0)
+p.push(new A.fX("00m00s000ms",s,a.b,r,50,100,15,"#000000",0.15,!0))}s=A.atJ(0.15,p,"",0,"capcut-cogaihoatngon",!1,null,-1,-1,B.c_,"#EAB308",10,"#000000",a.b,q,1,a.d,0)
 if(!b.d)b.a.$1(s)},
 anY(a,b){var s=this.c
 s=s.awI(a.a,a.b,a.c)
@@ -99197,7 +99197,7 @@ if(n==null)n=i
 if(n==null)n=50
 m=A.hV(s.i(a,"widthPercentage"))
 if(m==null)m=i
-if(m==null)m=80
+if(m==null)m=100
 l=A.hV(s.i(a,"blurRadius"))
 if(l==null)l=i
 if(l==null)l=15
@@ -100818,7 +100818,7 @@ $S:60}
 A.agC.prototype={
 $0(){var s=this.a.a
 s=s.length!==0?B.b.gaj(s).b:"99m59s999ms"
-J.aI(A.aC(this.b,!1,t.F),new A.ra(new A.fX("00m00s000ms",s,80,15,50,80,25,"#000000",0.4,!0)))},
+J.aI(A.aC(this.b,!1,t.F),new A.ra(new A.fX("00m00s000ms",s,80,15,50,100,25,"#000000",0.4,!0)))},
 $S:0}
 A.agD.prototype={
 $2(a,b){var s=null
