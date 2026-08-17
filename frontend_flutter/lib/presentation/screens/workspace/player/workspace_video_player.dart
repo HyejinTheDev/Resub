@@ -500,40 +500,43 @@ class _WorkspaceVideoPlayerState extends State<WorkspaceVideoPlayer> {
                                         ),
                                       );
                                     },
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // Thick border stroke behind the text
-                                        Text(
-                                          activeSub.text,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize:
-                                                state.subtitleFontSize * 1.5,
-                                            fontWeight: FontWeight.bold,
-                                            foreground: Paint()
-                                              ..style = PaintingStyle.stroke
-                                              ..strokeWidth = 5.0
-                                              ..color = _colorFromHex(
-                                                state.subtitleOutlineColor,
-                                              ),
-                                          ),
-                                        ),
-                                        // Solid foreground text
-                                        Text(
-                                          activeSub.text,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: _colorFromHex(
-                                              state.subtitleColor,
+                                    child: () {
+                                      final double scale = constraints.maxHeight / 432.0;
+                                      final double calculatedFontSize = (state.subtitleFontSize * 1.5 * 0.75) * scale;
+                                      final double calculatedStrokeWidth = 5.0 * scale;
+                                      return Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // Thick border stroke behind the text
+                                          Text(
+                                            activeSub.text,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: calculatedFontSize,
+                                              fontWeight: FontWeight.bold,
+                                              foreground: Paint()
+                                                ..style = PaintingStyle.stroke
+                                                ..strokeWidth = calculatedStrokeWidth
+                                                ..color = _colorFromHex(
+                                                  state.subtitleOutlineColor,
+                                                ),
                                             ),
-                                            fontSize:
-                                                state.subtitleFontSize * 1.5,
-                                            fontWeight: FontWeight.bold,
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                          // Solid foreground text
+                                          Text(
+                                            activeSub.text,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: _colorFromHex(
+                                                state.subtitleColor,
+                                              ),
+                                              fontSize: calculatedFontSize,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }(),
                                   ),
                                 ),
                               ),
