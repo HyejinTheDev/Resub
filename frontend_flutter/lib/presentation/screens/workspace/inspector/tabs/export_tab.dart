@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../../core/utils/download_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -68,6 +69,72 @@ class _ExportTabState extends State<ExportTab> {
     } else {
       return 'Khoảng ~ $seconds giây';
     }
+  }
+
+  int _parseTimeToMs(String timeStr) {
+    final match = RegExp(
+      r'(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?',
+    ).firstMatch(timeStr);
+    if (match == null) return 0;
+    final m = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final s = int.tryParse(match.group(2) ?? '0') ?? 0;
+    final ms = int.tryParse(match.group(3) ?? '0') ?? 0;
+    return m * 60 * 1000 + s * 1000 + ms;
+  }
+
+  String _formatMsToSrtTime(int ms) {
+    final int seconds = ms ~/ 1000;
+    final int milliseconds = ms % 1000;
+    final int minutes = seconds ~/ 60;
+    final int hours = minutes ~/ 60;
+
+    final String hStr = (hours % 24).toString().padLeft(2, '0');
+    final String mStr = (minutes % 60).toString().padLeft(2, '0');
+    final String sStr = (seconds % 60).toString().padLeft(2, '0');
+    final String msStr = milliseconds.toString().padLeft(3, '0');
+
+    return '$hStr:$mStr:$sStr,$msStr';
+  }
+
+  void _exportSrt(List<dynamic> subtitles, WorkspaceState state) {
+    if (subtitles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không có phụ đề để xuất!')),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    final sortedSubs = List<dynamic>.from(subtitles)
+      ..sort((a, b) {
+        final startA = _parseTimeToMs(a.startTime);
+        final startB = _parseTimeToMs(b.startTime);
+        return startA.compareTo(startB);
+      });
+
+    for (int i = 0; i < sortedSubs.length; i++) {
+      final sub = sortedSubs[i];
+      final startMs = _parseTimeToMs(sub.startTime);
+      final endMs = _parseTimeToMs(sub.endTime);
+
+      final startSrt = _formatMsToSrtTime(startMs);
+      final endSrt = _formatMsToSrtTime(endMs);
+
+      buffer.writeln('${i + 1}');
+      buffer.writeln('$startSrt --> $endSrt');
+      buffer.writeln(sub.text);
+      buffer.writeln();
+    }
+
+    final srtContent = buffer.toString();
+    final String videoName = state.videoData['projectName'] ?? state.videoData['videoName'] ?? 'subtitles';
+    final String filename = '${videoName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.srt';
+
+    DownloadHelper.downloadFile(srtContent, filename);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Đã tải xuống file phụ đề: $filename')),
+    );
   }
 
   Future<void> _startExport(BuildContext context, WorkspaceState state) async {
@@ -445,6 +512,17 @@ class _ExportTabState extends State<ExportTab> {
                   onPressed: () => _startExport(context, state),
                   child: const Text('BẮT ĐẦU XUẤT VIDEO DỊCH'),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _exportSrt(state.subtitles, state),
+                  icon: const Icon(Icons.subtitles, size: 16),
+                  label: const Text('TẢI XUỐNG PHỤ ĐỀ (.SRT)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
 
                 if (_statusMessage.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -534,6 +612,17 @@ class _ExportTabState extends State<ExportTab> {
                         );
                       },
                       child: const Text('SAO CHÉP LIÊN KẾT TẢI VIDEO'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => _exportSrt(state.subtitles, state),
+                      icon: const Icon(Icons.subtitles, size: 16),
+                      label: const Text('TẢI XUỐNG PHỤ ĐỀ (.SRT)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
